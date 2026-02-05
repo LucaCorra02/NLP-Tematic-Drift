@@ -1,6 +1,5 @@
 import requests
 import pandas as pd
-import time
 import os
 
 class Scraper:
@@ -10,9 +9,9 @@ class Scraper:
         self.userEmail = email
         self.issn = issn
 
-    def scrapedata(self, from_year, to_year, max_papers = 10):
+    def scrapedata(self, from_year, to_year, max_papers = 200):
         assert from_year <= to_year
-        assert max_papers > 0
+        assert 0 < max_papers <= 200
 
         start_date = "{year}-01-01".format(year = from_year)
         end_date = "{year}-12-31".format(year=to_year)
@@ -45,8 +44,21 @@ class Scraper:
         except Exception as e:
             print(f"Error: {e}")
 
+    @staticmethod
+    def reconstruct_abstract(abstract):
+        text = []
+        for key, value in abstract.items():
+            for index in value:
+                text.append((index, key))
+
+        sorted_text = sorted(text, key=lambda x: x[0])
+        return " ".join([pair[1] for pair in sorted_text])
+
+
 
 iss = "1680-7324"
 s = Scraper(os.environ.get('API_EMAIL'), iss)
-ris = Scraper.scrapedata(s,2023,2023)
-print(ris)
+ris = Scraper.scrapedata(s,2025,2025, max_papers = 1)
+print(ris[0])
+abstract = Scraper.reconstruct_abstract(ris[0]['abstract_inverted_index'])
+print(abstract)
