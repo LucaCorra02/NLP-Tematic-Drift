@@ -30,10 +30,10 @@ class ValidateData:
         df = self.dataframe
         duplicate_dict = {}
 
-        duplicate_ids = df[df.duplicated(subset=["id"], keep=False)]
+        duplicate_ids = df[df.duplicated(subset=["id"])]
         duplicate_dict["id"] = (0, [])
         if len(duplicate_ids) > 0:
-            duplicate_dict["id"] = (len(duplicate_ids), duplicate_dict["id"].to_list())
+            duplicate_dict["id"] = (len(duplicate_ids), duplicate_ids["id"].to_list())
 
         df_with_doi = df[df["doi"].notna()]
         duplicate_dois = df_with_doi[df_with_doi.duplicated(subset=["doi"])]
@@ -62,25 +62,34 @@ class ValidateData:
 
         df = self.dataframe
         valid_issn = df["primary_location"].apply(check_issn_row)
-        return {"invalid-issn": (valid_issn.sum() - len(df), df[~valid_issn]["id"].to_list())}
+        return {"invalid-issn": (len(df) - valid_issn.sum(), df[~valid_issn]["id"].to_list())}
 
-    def abstract_metrics(self):
+    def abstract_metrics(self, num_bins = 50):
         df = self.dataframe
-        dict_abs = {"empyt_abs": 0, "abs_nan": df["abstract"].isna().sum(), "abs_len": {}, "num_abs": df["abstract"].notna().sum()}
-        for value in df["abstract"]:
-            parsed = value.strip().replace(" ","")
-            if parsed == "":
-                dict_abs["empyt_abs"]+=1
-                continue
-            if len(parsed) in dict_abs["abs_len"]:
-                dict_abs["abs_len"][len(parsed)]+=1
-            else:
-                dict_abs["abs_len"][len(parsed)]=1
+        df["abstract_length"] = df["abstract"].str.strip().replace(" ","").str.len()
+        dict_abs = {
+            "empty_abs": (df["abstract_length"] == 0).sum(), "abs_nan": df["abstract"].isna().sum(),
+            "abs_distribution": {}, "num_abs": df["abstract"].notna().sum(),
+            "too_short": (df["abstract_length"] <= 100).sum(),  # <= 100 chars
+            "too_long": (df["abstract_length"] > 5000).sum(),  # > 5000 chars
+            "mean_length": df["abstract_length"].mean(),
+            "median_length": df["abstract_length"].median()
+        }
 
-        total_with_abs = sum(dict_abs["abs_len"].values())
-        assert len(df["abstract"]) - (dict_abs["empyt_abs"] + dict_abs["abs_nan"]) == total_with_abs
 
-        return dict_abs, total_with_abs
+        min, max = df.loc[df["abstract_length"] > 0, "abstract_length"].min(), df["abstract_length"].max()
+        bins = int((max - min) / num_bins)
+        bin_edges = range(int(min), int(max) + bins, bins)
+        cats = pd.cut(
+            df.loc[df["abstract_length"] > 0, "abstract_length"],
+            bins=bin_edges,
+            include_lowest=True,
+            right=True
+        )
+        counts = cats.value_counts(sort=False)
+        dict_abs["abs_distribution"] = {str(interval): int(count) for interval, count in counts.items()}
+        assert len(df["abstract"]) - (dict_abs["empty_abs"] + dict_abs["abs_nan"]) ==  sum(dict_abs["abs_distribution"].values())
+        return dict_abs
 
     def cited_metrics(self):
         df = self.dataframe
