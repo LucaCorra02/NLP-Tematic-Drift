@@ -1,5 +1,3 @@
-from tabnanny import check
-
 import pandas as pd
 
 
@@ -66,9 +64,23 @@ class ValidateData:
         valid_issn = df["primary_location"].apply(check_issn_row)
         return {"invalid-issn": (valid_issn.sum() - len(df), df[~valid_issn]["id"].to_list())}
 
-
     def abstract_metrics(self):
-        pass
+        df = self.dataframe
+        dict_abs = {"empyt_abs": 0, "abs_nan": df["abstract"].isna().sum(), "abs_len": {}, "num_abs": df["abstract"].notna().sum()}
+        for value in df["abstract"]:
+            parsed = value.strip().replace(" ","")
+            if parsed == "":
+                dict_abs["empyt_abs"]+=1
+                continue
+            if len(parsed) in dict_abs["abs_len"]:
+                dict_abs["abs_len"][len(parsed)]+=1
+            else:
+                dict_abs["abs_len"][len(parsed)]=1
+
+        total_with_abs = sum(dict_abs["abs_len"].values())
+        assert len(df["abstract"]) - (dict_abs["empyt_abs"] + dict_abs["abs_nan"]) == total_with_abs
+
+        return dict_abs, total_with_abs
 
     def cited_metrics(self):
         pass
@@ -86,3 +98,4 @@ if __name__ == '__main__':
     duplicate_dict = validate.check_duplicate()
     print(duplicate_dict)
     print(validate.check_issn())
+    print(validate.abstract_metrics())
