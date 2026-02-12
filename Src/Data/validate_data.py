@@ -73,9 +73,9 @@ class ValidateData:
             "too_short": (df["abstract_length"] <= 100).sum(),  # <= 100 chars
             "too_long": (df["abstract_length"] > 5000).sum(),  # > 5000 chars
             "mean_length": df["abstract_length"].mean(),
-            "median_length": df["abstract_length"].median()
+            "median_length": df["abstract_length"].median(),
+            "median_std": df["abstract_length"].std()
         }
-
 
         min, max = df.loc[df["abstract_length"] > 0, "abstract_length"].min(), df["abstract_length"].max()
         bins = int((max - min) / num_bins)
@@ -91,19 +91,31 @@ class ValidateData:
         assert len(df["abstract"]) - (dict_abs["empty_abs"] + dict_abs["abs_nan"]) ==  sum(dict_abs["abs_distribution"].values())
         return dict_abs
 
-    def cited_metrics(self):
+    def cited_metrics(self, num_bins = 10):
         df = self.dataframe
         cited_dict = {
             "cited_nan":df["cited_by_count"].isna().sum(),
             "counts_year_nan":df["counts_by_year"].isna().sum(),
             "cited_distribution":{},
-            "cited_per_year":{}
+            "cited_per_year":{},
+            "cited_min": df["cited_by_count"].min(),
+            "cited_max": df["cited_by_count"].max(),
+            "cited_avg": df["cited_by_count"].mean(),
+            "cited_median": df["cited_by_count"].median(),
+            "cited_std": df["cited_by_count"].std()
         }
-        for value in df["cited_by_count"]:
-            if value in cited_dict["cited_distribution"]:
-                cited_dict["cited_distribution"][value]+=1
-            else:
-                cited_dict["cited_distribution"][value]=1
+        min, max = cited_dict["cited_min"], cited_dict["cited_max"]
+        print(min, max)
+        bins = int((max - min) / num_bins)
+        bin_edges = range(int(min), int(max)+bins, bins)
+        cats = pd.cut(
+            df["cited_by_count"],
+            bins=bin_edges,
+            include_lowest=True,
+            right=True
+        )
+        counts = cats.value_counts(sort=False)
+        cited_dict["cited_distribution"] = {str(interval): int(count) for interval, count in counts.items()}
 
         for list_citation in df["counts_by_year"]:
             for value in list_citation:
@@ -145,6 +157,12 @@ class ValidateData:
         dict_concept["concept_distribution"] = dict(counter)
         assert len(df["concepts"]) - (dict_concept["nan_concept"] + dict_concept["empty_concepts"]) == sum(dict_concept["concept_distribution"].values())
         return dict_concept
+
+    #TODO Year metrics
+
+    #TODO RUN ALL methods
+
+    #TODO Save metrics
 
 
 
