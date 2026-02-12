@@ -66,7 +66,7 @@ class ValidateData:
 
     def abstract_metrics(self, num_bins = 50):
         df = self.dataframe
-        df["abstract_length"] = df["abstract"].str.strip().replace(" ","").str.len()
+        df["abstract_length"] = df["abstract"].str.strip().str.replace(" ","").str.len()
         dict_abs = {
             "empty_abs": (df["abstract_length"] == 0).sum(), "abs_nan": df["abstract"].isna().sum(),
             "abs_distribution": {}, "num_abs": df["abstract"].notna().sum(),
@@ -74,18 +74,18 @@ class ValidateData:
             "too_long": (df["abstract_length"] > 5000).sum(),  # > 5000 chars
             "mean_length": df["abstract_length"].mean(),
             "median_length": df["abstract_length"].median(),
-            "median_std": df["abstract_length"].std()
+            "median_std": df["abstract_length"].std(),
+            "min": df.loc[df["abstract_length"] > 0, "abstract_length"].min(),
+            "max": df["abstract_length"].max()
         }
-
-        min, max = df.loc[df["abstract_length"] > 0, "abstract_length"].min(), df["abstract_length"].max()
-        bins = int((max - min) / num_bins)
-        bin_edges = range(int(min), int(max) + bins, bins)
         cats = pd.cut(
             df.loc[df["abstract_length"] > 0, "abstract_length"],
-            bins=bin_edges,
+            bins=num_bins,
             include_lowest=True,
             right=True
         )
+        first_bins = cats.cat.categories[0]
+        cats = cats.cat.rename_categories({cats.cat.categories[0]: pd.Interval(dict_abs["min"], first_bins.right)})
         counts = cats.value_counts(sort=False)
         dict_abs["abs_distribution"] = {str(interval): int(count) for interval, count in counts.items()}
         assert len(df["abstract"]) - (dict_abs["empty_abs"] + dict_abs["abs_nan"]) ==  sum(dict_abs["abs_distribution"].values())
@@ -104,16 +104,15 @@ class ValidateData:
             "cited_median": df["cited_by_count"].median(),
             "cited_std": df["cited_by_count"].std()
         }
-        min, max = cited_dict["cited_min"], cited_dict["cited_max"]
-        print(min, max)
-        bins = int((max - min) / num_bins)
-        bin_edges = range(int(min), int(max)+bins, bins)
+        #assert max - min >= num_bins
         cats = pd.cut(
             df["cited_by_count"],
-            bins=bin_edges,
+            bins=num_bins,
             include_lowest=True,
             right=True
         )
+        first_bins = cats.cat.categories[0]
+        cats = cats.cat.rename_categories({cats.cat.categories[0]: pd.Interval(cited_dict["cited_min"], first_bins.right)})
         counts = cats.value_counts(sort=False)
         cited_dict["cited_distribution"] = {str(interval): int(count) for interval, count in counts.items()}
 
