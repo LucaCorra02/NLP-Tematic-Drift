@@ -1,7 +1,5 @@
-from math import nan
-
 import pandas as pd
-from numpy.matlib import empty
+from collections import Counter
 
 
 class ConvertData:
@@ -121,11 +119,26 @@ class ValidateData:
         assert len(df["language"]) - language_dict["language_nan"]  == sum(language_dict["language_distribution"].values())
         return language_dict
 
-    def year_metrics(self):
-        pass
-
     def type_metrics(self):
-        pass
+        df = self.dataframe
+        dict_concept = {"nan_concept":df["concepts"].isna().sum(), "empty_concepts":0 , "concept_distribution":{}}
+
+        counter = Counter()
+        for concept_list in df["concepts"]: #only take the highest score of level1 (macro area)
+            level1_concepts = [c for c in concept_list if c.get('level') == 1]
+            if len(level1_concepts) == 0: #empty concept or not have level1 concept
+                dict_concept["empty_concepts"]+=1
+                continue
+            if level1_concepts:
+                best = max(level1_concepts, key=lambda x: x.get('score', 0))
+                counter[best['display_name']] += 1
+
+        dict_concept["concept_distribution"] = dict(counter)
+        assert len(df["concepts"]) - (dict_concept["nan_concept"] + dict_concept["empty_concepts"]) == sum(dict_concept["concept_distribution"].values())
+        return dict_concept
+
+
+
 
 
 if __name__ == '__main__':
@@ -140,3 +153,4 @@ if __name__ == '__main__':
     print(validate.abstract_metrics())
     print(validate.cited_metrics())
     print(validate.language_metrics())
+    print(validate.type_metrics())
