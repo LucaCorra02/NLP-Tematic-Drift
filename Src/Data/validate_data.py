@@ -111,7 +111,15 @@ class ValidateData:
 
 
     def language_metrics(self):
-        pass
+        df = self.dataframe
+        language_dict = {"language_nan":df["language"].isna().sum(), "language_distribution":{}}
+        for language in df["language"]:
+            if language in language_dict["language_distribution"]:
+                language_dict["language_distribution"][language]+=1
+            else:
+                language_dict["language_distribution"][language]=1
+        assert len(df["language"]) - language_dict["language_nan"]  == sum(language_dict["language_distribution"].values())
+        return language_dict
 
     def year_metrics(self):
         pass
@@ -131,3 +139,4 @@ if __name__ == '__main__':
     print(validate.check_issn())
     print(validate.abstract_metrics())
     print(validate.cited_metrics())
+    print(validate.language_metrics())
