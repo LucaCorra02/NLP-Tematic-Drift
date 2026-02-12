@@ -1,4 +1,7 @@
+from math import nan
+
 import pandas as pd
+from numpy.matlib import empty
 
 
 class ConvertData:
@@ -60,7 +63,6 @@ class ValidateData:
             return True
 
         df = self.dataframe
-        print( df["primary_location"].isna().sum())
         valid_issn = df["primary_location"].apply(check_issn_row)
         return {"invalid-issn": (valid_issn.sum() - len(df), df[~valid_issn]["id"].to_list())}
 
@@ -83,9 +85,38 @@ class ValidateData:
         return dict_abs, total_with_abs
 
     def cited_metrics(self):
-        pass
+        df = self.dataframe
+        cited_dict = {
+            "cited_nan":df["cited_by_count"].isna().sum(),
+            "counts_year_nan":df["counts_by_year"].isna().sum(),
+            "cited_distribution":{},
+            "cited_per_year":{}
+        }
+        for value in df["cited_by_count"]:
+            if value in cited_dict["cited_distribution"]:
+                cited_dict["cited_distribution"][value]+=1
+            else:
+                cited_dict["cited_distribution"][value]=1
+
+        for list_citation in df["counts_by_year"]:
+            for value in list_citation:
+                if value["year"] in cited_dict["cited_per_year"]:
+                    cited_dict["cited_per_year"][value["year"]] += value["cited_by_count"]
+                else:
+                    cited_dict["cited_per_year"][value["year"]] = value["cited_by_count"]
+
+        assert len(df["cited_by_count"]) - cited_dict["cited_nan"] == sum(cited_dict["cited_distribution"].values())
+        assert  sum(cited_dict["cited_per_year"].values()) <= df["cited_by_count"].sum()
+        return  cited_dict
+
 
     def language_metrics(self):
+        pass
+
+    def year_metrics(self):
+        pass
+
+    def type_metrics(self):
         pass
 
 
@@ -99,3 +130,4 @@ if __name__ == '__main__':
     print(duplicate_dict)
     print(validate.check_issn())
     print(validate.abstract_metrics())
+    print(validate.cited_metrics())
