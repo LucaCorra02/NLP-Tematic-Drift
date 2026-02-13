@@ -1,3 +1,4 @@
+from statistics import stdev, mean
 import pandas as pd
 from collections import Counter
 
@@ -157,15 +158,35 @@ class ValidateData:
         assert len(df["concepts"]) - (dict_concept["nan_concept"] + dict_concept["empty_concepts"]) == sum(dict_concept["concept_distribution"].values())
         return dict_concept
 
-    #TODO Year metrics
+    def year_metrics(self):
+        df = self.dataframe
+        dict_year = {
+            "papers_nan_year": df["publication_year"].isna().sum(),
+            "missing_year":[],
+            "year_distribuction": {},
+            "avg_paper_per_year":0,
+            "std_paper_per_year":0,
+        }
+        counter = Counter(df["publication_year"].to_list())
+        dict_year["year_distribution"] = dict(sorted(dict(counter).items()))
+        year_list = list(dict_year["year_distribution"].keys()) # needs to be sorted
+        missing_year = []
+        for i in range(0, len(year_list)-1, 2):
+            if year_list[i]+1 != year_list[i+1]:
+                gap = year_list[i+1] - year_list[i]
+                missing_year+= [year_list[i]+index for index in range(1,gap)]
+
+        dict_year["missing_year"] = missing_year
+        values = list(dict_year["year_distribution"].values())
+        dict_year["avg_paper_per_year"] = mean(values)
+        dict_year["std_paper_per_year"] = stdev(values)
+
+        assert len(df["publication_year"]) - dict_year["papers_nan_year"] == sum(dict_year["year_distribution"].values())
+        return  dict_year
 
     #TODO RUN ALL methods
 
     #TODO Save metrics
-
-
-
-
 
 if __name__ == '__main__':
     #conv = ConvertData("Raw/scraped_data_final.json", "Raw/scraped_data.parquet")
@@ -180,3 +201,4 @@ if __name__ == '__main__':
     print(validate.cited_metrics())
     print(validate.language_metrics())
     print(validate.type_metrics())
+    print(validate.year_metrics())
