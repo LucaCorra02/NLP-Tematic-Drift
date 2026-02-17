@@ -1,7 +1,18 @@
 from statistics import stdev, mean
 import pandas as pd
 from collections import Counter
+import json
+import numpy as np
 
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
 
 class ConvertData:
     def __init__(self, input_json_path, output_parquet_path):
@@ -184,21 +195,26 @@ class ValidateData:
         assert len(df["publication_year"]) - dict_year["papers_nan_year"] == sum(dict_year["year_distribution"].values())
         return  dict_year
 
-    #TODO RUN ALL methods
-
-    #TODO Save metrics
+    def run_all_check(self, output_path):
+        assert output_path != ""
+        full_report = {}
+        full_report.update(self.check_duplicate())
+        full_report.update(self.check_issn())
+        full_report["abstract_metrics"] = self.abstract_metrics()
+        full_report["cited_metrics"] = self.cited_metrics()
+        full_report["language_metrics"] = self.language_metrics()
+        full_report["type_metrics"] = self.type_metrics()
+        full_report["year_metrics"] = self.year_metrics()
+        try:
+            with open(output_path, 'w', encoding='utf-8') as file:
+                json.dump(full_report, file, indent=4, cls=NpEncoder)
+            print(f"Check completati. Report salvato in: {output_path}")
+        except Exception as e:
+            print(f"Errore durante il salvataggio del report: {e}")
 
 if __name__ == '__main__':
     #conv = ConvertData("Raw/scraped_data_final.json", "Raw/scraped_data.parquet")
     #converted_record = conv.convert()
     #print("Converted record: ", converted_record)
     validate = ValidateData("Raw/scraped_data.parquet","ciao")
-    #validate.count_nan()
-    duplicate_dict = validate.check_duplicate()
-    print(duplicate_dict)
-    print(validate.check_issn())
-    print(validate.abstract_metrics())
-    print(validate.cited_metrics())
-    print(validate.language_metrics())
-    print(validate.type_metrics())
-    print(validate.year_metrics())
+    validate.run_all_check("report.txt")
