@@ -66,7 +66,7 @@ class ValidateData:
         valid_issn = df["primary_location"].apply(check_issn_row)
         return {"invalid-issn": (len(df) - valid_issn.sum(), df[~valid_issn]["id"].to_list())}
 
-    def abstract_metrics(self, num_bins = 50):
+    def abstract_metrics(self, num_bins = 30):
         df = self.dataframe
         df["abstract_length"] = df["abstract"].str.strip().str.replace(" ","").str.len()
         dict_abs = {
@@ -80,9 +80,15 @@ class ValidateData:
             "min": df.loc[df["abstract_length"] > 0, "abstract_length"].min(),
             "max": df["abstract_length"].max()
         }
+
+        min_val = dict_abs["min"]
+        max_val = dict_abs["max"]
+        bins_edges = np.floor(np.linspace(min_val, max_val, num_bins + 1)).astype(int)
+        bins_edges = np.unique(bins_edges)
+
         cats = pd.cut(
             df.loc[df["abstract_length"] > 0, "abstract_length"],
-            bins=num_bins,
+            bins=bins_edges,
             include_lowest=True,
             right=True
         )
@@ -93,7 +99,7 @@ class ValidateData:
         assert len(df["abstract"]) - (dict_abs["empty_abs"] + dict_abs["abs_nan"]) ==  sum(dict_abs["abs_distribution"].values())
         return dict_abs
 
-    def cited_metrics(self, num_bins = 10):
+    def cited_metrics(self, num_bins = 30):
         df = self.dataframe
         cited_dict = {
             "cited_nan":df["cited_by_count"].isna().sum(),
@@ -104,12 +110,19 @@ class ValidateData:
             "cited_max": df["cited_by_count"].max(),
             "cited_avg": df["cited_by_count"].mean(),
             "cited_median": df["cited_by_count"].median(),
-            "cited_std": df["cited_by_count"].std()
+            "cited_std": df["cited_by_count"].std(),
+            "low_citation_count": 0, # citation < 10
+            "high_citation_count": 0, #citation > 100
+            "zero_citation_count": 0
         }
-        #assert max - min >= num_bins
+
+        min_val = cited_dict["cited_min"]
+        max_val = cited_dict["cited_max"]
+        bins_edges = np.floor(np.linspace(min_val, max_val, num_bins + 1)).astype(int)
+        bins_edges = np.unique(bins_edges)
         cats = pd.cut(
             df["cited_by_count"],
-            bins=num_bins,
+            bins=bins_edges,
             include_lowest=True,
             right=True
         )
@@ -125,6 +138,9 @@ class ValidateData:
                 else:
                     cited_dict["cited_per_year"][value["year"]] = value["cited_by_count"]
 
+        cited_dict["low_citation_count"] = len(df[df["cited_by_count"] < 10])
+        cited_dict["high_citation_count"] = len(df[df["cited_by_count"] > 100])
+        cited_dict["zero_citation_count"] = len(df[df["cited_by_count"] == 0])
         assert len(df["cited_by_count"]) - cited_dict["cited_nan"] == sum(cited_dict["cited_distribution"].values())
         assert  sum(cited_dict["cited_per_year"].values()) <= df["cited_by_count"].sum()
         return  cited_dict
@@ -164,7 +180,7 @@ class ValidateData:
         dict_year = {
             "papers_nan_year": df["publication_year"].isna().sum(),
             "missing_year":[],
-            "year_distribuction": {},
+            "year_distribution": {},
             "avg_paper_per_year":0,
             "std_paper_per_year":0,
         }
