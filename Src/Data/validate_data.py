@@ -195,8 +195,7 @@ class ValidateData:
         assert len(df["publication_year"]) - dict_year["papers_nan_year"] == sum(dict_year["year_distribution"].values())
         return  dict_year
 
-    def run_all_check(self, output_path):
-        assert output_path != ""
+    def run_all_check(self):
         full_report = {}
         full_report.update(self.check_duplicate())
         full_report.update(self.check_issn())
@@ -206,15 +205,15 @@ class ValidateData:
         full_report["type_metrics"] = self.type_metrics()
         full_report["year_metrics"] = self.year_metrics()
         try:
-            with open(output_path, 'w', encoding='utf-8') as file:
+            with open(self.output_metrics_path, 'w', encoding='utf-8') as file:
                 json.dump(full_report, file, indent=4, cls=NpEncoder)
-            print(f"Check completati. Report salvato in: {output_path}")
+            print(f"Report salvato in: {self.output_metrics_path}")
         except Exception as e:
-            print(f"Errore durante il salvataggio del report: {e}")
+            print(f"Errore durante il salvataggio: {e}")
 
 if __name__ == '__main__':
     #conv = ConvertData("Raw/scraped_data_final.json", "Raw/scraped_data.parquet")
     #converted_record = conv.convert()
     #print("Converted record: ", converted_record)
-    validate = ValidateData("Raw/scraped_data.parquet","ciao")
-    validate.run_all_check("report.txt")
+    validate = ValidateData("Raw/scraped_data.parquet","Raw/report.txt")
+    validate.run_all_check()
