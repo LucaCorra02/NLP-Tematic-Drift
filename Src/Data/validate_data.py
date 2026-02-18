@@ -4,16 +4,6 @@ from collections import Counter
 import json
 import numpy as np
 
-class NpEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.integer):
-            return int(obj)
-        if isinstance(obj, np.floating):
-            return float(obj)
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return super(NpEncoder, self).default(obj)
-
 class ConvertData:
     def __init__(self, input_json_path, output_parquet_path):
         assert input_json_path and output_parquet_path is not None
@@ -211,9 +201,20 @@ class ValidateData:
         except Exception as e:
             print(f"Errore durante il salvataggio: {e}")
 
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
+
+
 if __name__ == '__main__':
-    #conv = ConvertData("Raw/scraped_data_final.json", "Raw/scraped_data.parquet")
-    #converted_record = conv.convert()
-    #print("Converted record: ", converted_record)
+    conv = ConvertData("Raw/scraped_data_final.json", "Raw/scraped_data.parquet")
+    converted_record = conv.convert()
+    print("Converted record: ", converted_record)
     validate = ValidateData("Raw/scraped_data.parquet","Raw/report.txt")
     validate.run_all_check()
