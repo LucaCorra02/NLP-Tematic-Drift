@@ -283,7 +283,35 @@ class PlotData:
 
         print("Saved: language_distribution.png")
 
-    # TODO: Aggiunge abs quality (min, max, nan, empty)
+    def plot_nan_value(self):
+        dict_nan = self.metrics['nan_fileds']
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+        fields = list(dict_nan.keys())
+        nan_counts = list(dict_nan.values())
+        fields.append("issn")
+        nan_counts.append(self.metrics['invalid-issn'][0])
+
+        bars = ax.bar(fields, nan_counts, color="blue", alpha=0.7, edgecolor='black', linewidth=1.5)
+        ax.set_xlabel('Dataset Fields', fontsize=12)
+        ax.set_ylabel('Number of Missing Values (NaNs)', fontsize=12)
+        ax.set_yscale('log')
+        ax.set_title('Missing Values (NaNs) per Field', fontsize=14, fontweight='bold')
+        ax.set_xticks(range(len(fields)))
+        ax.set_xticklabels(fields, rotation=40, ha='right', fontsize=9)
+
+        ax.grid(axis='y', alpha=0.3, which='both', linestyle='--')
+        for bar in bars:
+            height = bar.get_height()
+            if height > 0:
+                ax.text(bar.get_x() + bar.get_width() / 2, height * 1.1,
+                        f'{int(height):,}',
+                        ha='center', va='bottom', fontweight='bold', fontsize=9)
+
+        plt.tight_layout()
+        plt.savefig(self.output_dir / 'nan_distribution.png', dpi=300, bbox_inches='tight')
+        plt.close(fig)
+        print("Saved: nan_distribution.png")
 
     """
         Textual Report
@@ -384,4 +412,5 @@ if __name__ == '__main__':
         output_dir="plots"
     )
 
-    plotter.generate_all_plots()
+    #plotter.generate_all_plots()
+    plotter.plot_nan_value()
