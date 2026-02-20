@@ -314,6 +314,64 @@ class PlotData:
         print("Saved: nan_distribution.png")
 
     """
+        Authors metrics
+    """
+    def plot_authors_distribution(self):
+        stats = self.metrics['authors_metrics']
+        author_dist = stats['author_count_distribution']
+
+        max_auth = int(stats['max_authors'])
+        min_auth = min([int(keys) for keys in author_dist.keys()])
+        x_vals = list(range(min_auth, max_auth + 1))
+        y_vals = [int(author_dist.get(str(x), 0)) for x in x_vals]
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 6))
+        ax1.bar(x_vals, y_vals, color='mediumpurple', edgecolor='black', alpha=0.7)
+        ax1.set_title('Authors per Paper Distribution (Log Scale)', fontsize=14, fontweight='bold')
+        ax1.set_xlabel('Number of Authors')
+        ax1.set_ylabel('Number of Papers (Log Scale)')
+        ax1.grid(axis='y', linestyle='--', alpha=0.3)
+        ax1.set_xticks(range(1, max_auth + 1, 9))
+
+
+        bar_metrics = {
+            'Avg Authors': stats['avg_authors_per_paper'],
+            'Max Authors': stats['max_authors'],
+            'Papers without Author': stats['papers_without_valid_author'],
+            'Papers with at least one Author': author_dist["1"]
+        }
+        keys = list(bar_metrics.keys())
+        values = list(bar_metrics.values())
+        y_pos = np.arange(len(keys))
+
+        # Barre orizzontali per Media e Max
+        ax2.barh(y_pos, values, color=['blue','red' ,'skyblue', 'lightcoral'], edgecolor='black', height=0.4)
+        ax2.set_yticks(y_pos)
+        ax2.set_yticklabels(keys, fontsize=12)
+        ax2.set_xlabel('Number of Authors', fontsize=12)
+        ax2.set_title('Authorship Statistics Summary', fontsize=14, fontweight='bold')
+        ax2.grid(axis='x', alpha=0.3, linestyle='--')
+
+        # Testo accanto alle barre
+        max_val = max(values)
+        for i, v in enumerate(values):
+            ax2.text(v + (max_val * 0.02), i, f'{v:.1f}', va='center', fontweight='bold', fontsize=11)
+
+        # Info Box per i conteggi assoluti dei paper
+        info_text = (
+            f"Total Valid Papers: {stats['papers_with_valid_author']:,}\n"
+            f"Papers w/o Valid Authors: {stats['papers_without_valid_author']:,}\n"
+            f"Empty Authorships: {stats['empty_authorships']:,}\n"
+            f"NaN Authorships: {stats['authorships_nan']:,}"
+        )
+
+        plt.tight_layout()
+        output_path = self.output_dir / 'authors_distribution.png'
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close(fig)
+        print(f"Saved: {output_path}")
+
+    """
         Textual Report
     """
     def generate_text_report(self, output_path="plots/data_report.txt"):
@@ -322,7 +380,12 @@ class PlotData:
                   f"Date Range:            {min(self.metrics['year_metrics']['year_distribution'].keys())} - {max(self.metrics['year_metrics']['year_distribution'].keys())}",
                   f"Avg Papers/Year:       {self.metrics['year_metrics']['avg_paper_per_year']:>10,.0f}",
                   f"Std Papers/Year:       {self.metrics['year_metrics']['std_paper_per_year']:>10,.0f}", "",
-                  "DATA QUALITY ISSUES", "-" * 80]
+                  "DATA QUALITY ISSUES", "-" * 80, f"Nan Fields:"]
+
+        #Nan
+        for key, value in self.metrics['nan_fileds'].items():
+            report.append(f"- {key:<20} : {value:>8}")
+        report.append("")
 
         # Duplicates
         total_dupes = self.metrics['id'][0] + self.metrics['doi'][0] + self.metrics['title'][0]
@@ -384,6 +447,16 @@ class PlotData:
             report.append(f"  {i}. {concept} {count} ({pct:>5.1f}%)")
         report.append("")
 
+        #Authors
+        report.append("AUTHOR STATISTICS")
+        report.append("-" * 80)
+        report.append(f"Authorships nan:        {self.metrics['authors_metrics']["authorships_nan"]:>14,}")
+        report.append(f"Zero authorships:        {self.metrics['authors_metrics']["papers_without_valid_author"]:>13,}")
+        report.append(f"Max authors per paper:        {self.metrics['authors_metrics']["max_authors"]:>10,}")
+        report.append(f"Papers with at least one author:     {self.metrics['authors_metrics']["author_count_distribution"]["1"]:>1,}")
+        report.append(f"Avg authors per paper:        {self.metrics['authors_metrics']["avg_authors_per_paper"]:>10,.1f}")
+        report.append("")
+
         report.append("=" * 80)
         output_path = Path(output_path)
         with open(output_path, 'w', encoding='utf-8') as f:
@@ -404,6 +477,8 @@ class PlotData:
         self.plot_concept_coverage()
         self.plot_language_distribution()
         self.generate_text_report()
+        self.plot_nan_value()
+        self.plot_authors_distribution()
         print("FINISHED")
 
 if __name__ == '__main__':
@@ -412,5 +487,4 @@ if __name__ == '__main__':
         output_dir="plots"
     )
 
-    #plotter.generate_all_plots()
-    plotter.plot_nan_value()
+    plotter.generate_all_plots()
