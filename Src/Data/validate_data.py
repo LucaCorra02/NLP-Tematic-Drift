@@ -233,7 +233,7 @@ class ValidateData:
         papers_without_valid = 0
 
         for authorship_list in df["authorships"]:
-            if pd.isna(authorship_list).sum() > 0:
+            if authorship_list is None:
                 papers_without_valid += 1
                 author_counts.append(0)
                 continue
