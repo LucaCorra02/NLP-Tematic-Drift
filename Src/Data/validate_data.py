@@ -232,5 +232,5 @@ if __name__ == '__main__':
     conv = ConvertData("Raw/scraped_data_final.json", "Raw/scraped_data.parquet")
     converted_record = conv.convert()
     print("Converted record: ", converted_record)
-    validate = ValidateData("Raw/scraped_data.parquet","Raw/report.txt")
+    validate = ValidateData("Raw/scraped_data.parquet", "Raw/report.json")
     validate.run_all_check()
