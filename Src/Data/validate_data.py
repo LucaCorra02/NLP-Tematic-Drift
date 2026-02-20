@@ -23,13 +23,11 @@ class ValidateData:
         self.output_metrics_path = output_metrics_path
         self.dataframe = pd.read_parquet(self.input_parquet_path, engine='pyarrow')
 
-    #TODO: Migliorare controlli
     def count_nan(self):
         df = self.dataframe
         ris = df.isna().sum()
         nan_dict = {}
         for key, val in ris.items(): nan_dict[key] = val
-
 
         df = self.dataframe
         def count_nans_in_value(val):
@@ -276,13 +274,13 @@ class ValidateData:
         full_report = {}
         full_report.update(self.check_duplicate())
         full_report.update(self.check_issn())
-        print(self.count_nan())
+        full_report["nan_fileds"] = self.count_nan()
         full_report["abstract_metrics"] = self.abstract_metrics()
         full_report["cited_metrics"] = self.cited_metrics()
         full_report["language_metrics"] = self.language_metrics()
         full_report["type_metrics"] = self.type_metrics()
         full_report["year_metrics"] = self.year_metrics()
-        print(self.authors_metrics())
+        full_report["authors_metrics"] = self.authors_metrics()
         try:
             with open(self.output_metrics_path, 'w', encoding='utf-8') as file:
                 json.dump(full_report, file, indent=4, cls=NpEncoder)
