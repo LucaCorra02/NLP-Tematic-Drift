@@ -23,9 +23,33 @@ class ValidateData:
         self.output_metrics_path = output_metrics_path
         self.dataframe = pd.read_parquet(self.input_parquet_path, engine='pyarrow')
 
+    #TODO: Migliorare controlli
     def count_nan(self):
         df = self.dataframe
-        return  df.isna().sum()
+        ris = df.isna().sum()
+        nan_dict = {}
+        for key, val in ris.items(): nan_dict[key] = val
+
+
+        df = self.dataframe
+        def count_nans_in_value(val):
+            if isinstance(val, (list, np.ndarray)):
+                return sum(count_nans_in_value(item) for item in val)
+            elif isinstance(val, dict):
+                return sum(count_nans_in_value(v) for v in val.values())
+            else:
+                try:
+                    if pd.isna(val):
+                        return 1
+                    return 0
+                except ValueError:
+                    return 0
+
+        nan_dict = {}
+        for col in df.columns:
+            tot_nans = df[col].apply(count_nans_in_value).sum()
+            nan_dict[col] = int(tot_nans)
+        return nan_dict
 
     def check_duplicate(self):
         assert self.dataframe is not None
@@ -201,15 +225,64 @@ class ValidateData:
         assert len(df["publication_year"]) - dict_year["papers_nan_year"] == sum(dict_year["year_distribution"].values())
         return  dict_year
 
+    def authors_metrics(self):
+        df = self.dataframe
+        auth_dict = {"authorships_nan": df['authorships'].isna().sum(), "empty_authorships": 0,
+                     "papers_without_valid_author": 0, "author_count_distribution": {}, "avg_authors_per_paper": 0.0,
+                     "max_authors": 0, "papers_with_valid_author": 0}
+
+        author_counts = []
+        papers_without_valid = 0
+
+        for authorship_list in df["authorships"]:
+            if pd.isna(authorship_list).sum() > 0:
+                papers_without_valid += 1
+                author_counts.append(0)
+                continue
+
+            if len(authorship_list) == 0:
+                auth_dict["empty_authorships"] += 1
+                papers_without_valid += 1
+                author_counts.append(0)
+                continue
+
+            valid_authors = 0
+            for author_entry in authorship_list:
+                author_info = author_entry.get('author')
+                display_name = author_info.get('display_name')
+                if display_name and display_name.strip():
+                    valid_authors += 1
+
+            if valid_authors == 0:
+                papers_without_valid += 1
+
+            author_counts.append(valid_authors)
+
+        count_distribution = Counter(author_counts)
+        auth_dict["author_count_distribution"] = dict(sorted(count_distribution.items()))
+        auth_dict["papers_without_valid_author"] = papers_without_valid
+        auth_dict["papers_with_valid_author"] = len(df) - papers_without_valid
+
+        valid_counts = [c for c in author_counts if c > 0]
+        if valid_counts:
+            auth_dict["avg_authors_per_paper"] = sum(valid_counts) / len(valid_counts)
+            auth_dict["max_authors"] = max(valid_counts)
+
+        assert len(df["authorships"]) - (auth_dict["authorships_nan"] + auth_dict["empty_authorships"]) == sum(auth_dict["author_count_distribution"].values())
+        return auth_dict
+
+
     def run_all_check(self):
         full_report = {}
         full_report.update(self.check_duplicate())
         full_report.update(self.check_issn())
+        print(self.count_nan())
         full_report["abstract_metrics"] = self.abstract_metrics()
         full_report["cited_metrics"] = self.cited_metrics()
         full_report["language_metrics"] = self.language_metrics()
         full_report["type_metrics"] = self.type_metrics()
         full_report["year_metrics"] = self.year_metrics()
+        print(self.authors_metrics())
         try:
             with open(self.output_metrics_path, 'w', encoding='utf-8') as file:
                 json.dump(full_report, file, indent=4, cls=NpEncoder)
@@ -229,8 +302,8 @@ class NpEncoder(json.JSONEncoder):
 
 
 if __name__ == '__main__':
-    conv = ConvertData("Raw/scraped_data_final.json", "Raw/scraped_data.parquet")
-    converted_record = conv.convert()
-    print("Converted record: ", converted_record)
+    #conv = ConvertData("Raw/scraped_data_final.json", "Raw/scraped_data.parquet")
+    #converted_record = conv.convert()
+    #print("Converted record: ", converted_record)
     validate = ValidateData("Raw/scraped_data.parquet", "Raw/report.json")
     validate.run_all_check()
