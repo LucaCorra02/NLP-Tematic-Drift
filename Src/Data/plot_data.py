@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 
 class PlotData:
-    def __init__(self, parquet_path, metrics_json_path, output_dir="plots"):
+    def __init__(self, metrics_json_path, output_dir="plots"):
         with open(metrics_json_path, 'r') as f:
             self.metrics = json.load(f)
         self.output_dir = Path(output_dir)
@@ -285,27 +285,16 @@ class PlotData:
 
     # TODO: Aggiunge abs quality (min, max, nan, empty)
 
+    """
+        Textual Report
+    """
     def generate_text_report(self, output_path="plots/data_report.txt"):
-        """Genera report testuale dettagliato"""
-        report = []
-        report.append("=" * 80)
-        report.append("ATMOSPHERIC CHEMISTRY & PHYSICS - DATA VALIDATION REPORT")
-        report.append("=" * 80)
-        report.append("")
-
-        # Dataset Overview
-        report.append("📁 DATASET OVERVIEW")
-        report.append("-" * 80)
-        report.append(f"Total Papers:          {self.total_paper:>10,}")
-        report.append(
-            f"Date Range:            {min(self.metrics['year_metrics']['year_distribution'].keys())} - {max(self.metrics['year_metrics']['year_distribution'].keys())}")
-        report.append(f"Avg Papers/Year:       {self.metrics['year_metrics']['avg_paper_per_year']:>10,.0f}")
-        report.append(f"Std Papers/Year:       {self.metrics['year_metrics']['std_paper_per_year']:>10,.0f}")
-        report.append("")
-
-        # Data Quality
-        report.append("🔍 DATA QUALITY ISSUES")
-        report.append("-" * 80)
+        report = ["=" * 80, "ATMOSPHERIC CHEMISTRY & PHYSICS - DATA VALIDATION REPORT", "=" * 80, "",
+                  "DATASET OVERVIEW", "-" * 80, f"Total Papers:          {self.total_paper:>10,}",
+                  f"Date Range:            {min(self.metrics['year_metrics']['year_distribution'].keys())} - {max(self.metrics['year_metrics']['year_distribution'].keys())}",
+                  f"Avg Papers/Year:       {self.metrics['year_metrics']['avg_paper_per_year']:>10,.0f}",
+                  f"Std Papers/Year:       {self.metrics['year_metrics']['std_paper_per_year']:>10,.0f}", "",
+                  "DATA QUALITY ISSUES", "-" * 80]
 
         # Duplicates
         total_dupes = self.metrics['id'][0] + self.metrics['doi'][0] + self.metrics['title'][0]
@@ -313,19 +302,15 @@ class PlotData:
         report.append(f"  - By ID:             {self.metrics['id'][0]:>10}")
         report.append(f"  - By DOI:            {self.metrics['doi'][0]:>10}")
         report.append(f"  - By Title:          {self.metrics['title'][0]:>10}")
-        report.append(
-            f"  TOTAL:               {total_dupes:>10}  {'⚠️ ACTION REQUIRED' if total_dupes > 0 else '✅ OK'}")
+        report.append(f"  TOTAL:               {total_dupes:>10}")
         report.append("")
 
         # Abstract Quality
         report.append(f"Abstract Quality:")
         report.append(f"  - Total Abstracts:   {self.metrics['abstract_metrics']['num_abs']:>10,}")
-        report.append(
-            f"  - Empty:             {self.metrics['abstract_metrics']['empty_abs']:>10}  {'⚠️' if self.metrics['abstract_metrics']['empty_abs'] > 0 else '✅'}")
-        report.append(
-            f"  - Too Short (<100):  {self.metrics['abstract_metrics']['too_short']:>10}  {'⚠️' if self.metrics['abstract_metrics']['too_short'] > 0 else '✅'}")
-        report.append(
-            f"  - Too Long (>5000):  {self.metrics['abstract_metrics']['too_long']:>10}  {'⚠️' if self.metrics['abstract_metrics']['too_long'] > 0 else '✅'}")
+        report.append(f"  - Empty:             {self.metrics['abstract_metrics']['empty_abs']:>10}")
+        report.append(f"  - Too Short (<100):  {self.metrics['abstract_metrics']['too_short']:>10}")
+        report.append(f"  - Too Long (>5000):  {self.metrics['abstract_metrics']['too_long']:>10}")
         report.append(f"  - Mean Length:       {self.metrics['abstract_metrics']['mean_length']:>10,.0f} chars")
         report.append(f"  - Median Length:     {self.metrics['abstract_metrics']['median_length']:>10,.0f} chars")
         report.append("")
@@ -335,21 +320,20 @@ class PlotData:
         non_english = sum(v for k, v in lang_dist.items() if k != 'en')
         report.append(f"Language Distribution:")
         for lang, count in lang_dist.items():
-            flag = '✅' if lang == 'en' else '⚠️'
-            report.append(f"  - {lang.upper()}:                {count:>10,}  {flag}")
-        report.append(
-            f"  Non-English Total:   {non_english:>10}  {'⚠️ ACTION REQUIRED' if non_english > 0 else '✅ OK'}")
+            report.append(f"  - {lang}: {count}")
+        report.append(f"  Non-English Total:   {non_english:>10}")
         report.append("")
 
         # Year Outliers
-        invalid_years = [y for y in self.metrics['year_metrics']['year_distribution'].keys() if int(y) < 2001 or int(y) > 2026]
+        years_distribution = [key for key in self.metrics["year_metrics"]["year_distribution"].keys()]
+        missing_years = self.metrics["year_metrics"]["missing_year"]
         report.append(f"Year Validity:")
-        report.append(f"  - Valid Range:       2001 - 2026")
-        report.append(f"  - Invalid Years:     {len(invalid_years):>10}  {invalid_years if invalid_years else '✅ OK'}")
+        report.append(f"  - Years Range:       {years_distribution}")
+        report.append(f"  - Missing Years:     {missing_years}")
         report.append("")
 
         # Citations
-        report.append("📈 CITATION STATISTICS")
+        report.append("CITATION STATISTICS")
         report.append("-" * 80)
         report.append(f"Mean Citations:        {self.metrics['cited_metrics']['cited_avg']:>10,.1f}")
         report.append(f"Median Citations:      {self.metrics['cited_metrics']['cited_median']:>10,.0f}")
@@ -359,52 +343,20 @@ class PlotData:
         report.append("")
 
         # Concepts
-        report.append("🏷️  RESEARCH CONCEPTS")
+        report.append("RESEARCH CONCEPTS")
         report.append("-" * 80)
-        report.append(f"Papers with Concepts:  {self.total_paper - self.metrics['type_metrics']['empty_concepts']:>10,}")
-        report.append(f"Papers w/o Concepts:   {self.metrics['type_metrics']['empty_concepts']:>10,}")
+        report.append(f"Papers with L1 Concepts:  {self.total_paper - self.metrics['type_metrics']['empty_concepts']}")
+        report.append(f"Papers w/o L1 Concepts:   {self.metrics['type_metrics']['empty_concepts']}")
         report.append(f"\nTop 10 Concepts:")
 
         concept_dist = self.metrics['type_metrics']['concept_distribution']
         sorted_concepts = sorted(concept_dist.items(), key=lambda x: x[1], reverse=True)[:10]
         for i, (concept, count) in enumerate(sorted_concepts, 1):
             pct = (count / self.total_paper) * 100
-            report.append(f"  {i:2}. {concept:<30} {count:>6,} ({pct:>5.1f}%)")
+            report.append(f"  {i}. {concept} {count} ({pct:>5.1f}%)")
         report.append("")
 
-        # Recommendations
-        report.append("💡 CLEANING RECOMMENDATIONS")
-        report.append("-" * 80)
-
-        issues = []
-        if total_dupes > 0:
-            issues.append(f"✓ Remove {total_dupes} duplicate papers (by DOI/title)")
-        if invalid_years:
-            issues.append(f"✓ Remove {len(invalid_years)} papers with invalid years: {invalid_years}")
-        if self.metrics['abstract_metrics']['empty_abs'] > 0:
-            issues.append(f"✓ Remove {self.metrics['abstract_metrics']['empty_abs']} papers with empty abstracts")
-        if self.metrics['abstract_metrics']['too_short'] > 0:
-            issues.append(f"✓ Remove {self.metrics['abstract_metrics']['too_short']} papers with abstracts < 100 chars")
-        if non_english > 0:
-            issues.append(f"✓ Filter {non_english} non-English papers")
-
-        if issues:
-            for issue in issues:
-                report.append(issue)
-
-            estimated_clean = self.total_paper - (total_dupes + len(invalid_years) +
-                                              self.metrics['abstract_metrics']['empty_abs'] +
-                                              self.metrics['abstract_metrics']['too_short'] +
-                                              non_english)
-            report.append("")
-            report.append(f"Estimated papers after cleaning: {estimated_clean:,} (from {self.total_paper:,})")
-        else:
-            report.append("✅ No major issues detected - dataset looks good!")
-
-        report.append("")
         report.append("=" * 80)
-
-        # Save
         output_path = Path(output_path)
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write('\n'.join(report))
@@ -428,8 +380,7 @@ class PlotData:
 
 if __name__ == '__main__':
     plotter = PlotData(
-        parquet_path="Raw/scraped_data.parquet",
-        metrics_json_path="Raw/report.txt",
+        metrics_json_path="Raw/report.json",
         output_dir="plots"
     )
 
