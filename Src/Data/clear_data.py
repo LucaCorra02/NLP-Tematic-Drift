@@ -1,7 +1,11 @@
+from unittest.mock import inplace
+
 import pandas as pd
 import numpy as np
 from pathlib import Path
 import json
+
+from pyparsing import empty
 
 
 class CleanData:
@@ -36,8 +40,7 @@ class CleanData:
         self._remove_non_english()
 
         # Step 5 (Opzionale): ISSN invalidi
-        if remove_issn_invalid:
-            self._remove_invalid_issn()
+        self._remove_invalid_issn()
 
         # Step 6 (Opzionale): Paper senza autori
         if remove_no_authors:
@@ -88,11 +91,53 @@ class CleanData:
         print("after_year:", len(self.df))
 
     def _remove_bad_abstracts(self, min_length=100, max_length=5000):
-        pass
+        if self.df["abstract"].isna().sum() > 0:
+            self.df.dropna(subset=["abstract"], inplace=True)
+
+        self.df["abstract_len"] = self.df["abstract"].str.strip().str.replace(" ","").str.len()
+        empty_abs = self.df[self.df["abstract_len"] == 0]
+        if len(empty_abs) > 0:
+            self.df.drop(empty_abs.index, inplace=True)
+
+        low_char = self.df[self.df["abstract_len"] < min_length]
+        if len(low_char) > 0:
+            self.df.drop(low_char.index, inplace=True)
+
+        print("after_abstract:", len(self.df))
+
+
     def _remove_non_english(self):
-        pass
+        if self.df["language"].isna().sum() > 0:
+            self.df.dropna(subset=["language"], inplace=True)
+
+        language_filter = self.df[self.df["language"] != "en"]
+        if len(language_filter) > 0:
+            self.df.drop(language_filter.index, inplace=True)
+        print("after_language:", len(self.df))
+
     def _remove_invalid_issn(self, target_issn='1680-7324'):
-        pass
+        source_filter = self.df[self.df["primary_location"].str.get("source").isna()]
+        if len(source_filter) > 0:
+            self.df.drop(source_filter.index, inplace=True)
+
+        def filter_valid_issn(loc_dict):
+            if not isinstance(loc_dict, dict):
+                return False
+            source = loc_dict.get("source")
+            if not isinstance(source, dict) or not source:
+                return False
+            issn = source.get("issn")
+            if issn is None or len(issn) == 0:
+                return False
+            if target_issn not in issn:
+                return False
+            return True
+
+        filter_mask = self.df["primary_location"].apply(filter_valid_issn)
+        self.df = self.df[filter_mask]
+        print("after_issn:", len(self.df))
+
+
     def _remove_papers_without_authors(self):
         pass
     def _cleanup_temp_columns(self):
