@@ -84,9 +84,9 @@ class Scraper:
         with open(self.output_file_path, "a") as f:
             f.write(json.dumps(paper_record) + '\n')
 
-
-iss = "1680-7324"
-output_path = "Raw/scraped_data_final.json"
-s = Scraper(email=os.environ.get('API_EMAIL'), issn=iss, output_file_path=output_path)
-downloaded_paper = s.scrapedata(from_year=1900, to_year=2025, size_paper_batch = 200)
-print(downloaded_paper)
+if __name__ == '__main__':
+    iss = "1680-7324"
+    output_path = "Raw/scraped_data_final.json"
+    s = Scraper(email=os.environ.get('API_EMAIL'), issn=iss, output_file_path=output_path)
+    downloaded_paper = s.scrapedata(from_year=1900, to_year=2025, size_paper_batch = 200)
+    print(downloaded_paper)

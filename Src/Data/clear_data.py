@@ -31,7 +31,6 @@ class CleanData:
         self._remove_invalid_issn()
         if remove_no_authors:
             self._remove_papers_without_authors()
-        self._cleanup_temp_columns()
         self._save_cleaned_data()
         self._generate_report()
 
@@ -145,19 +144,14 @@ class CleanData:
             return authors_info
 
         self.df["authors_details"] = self.df["authorships"].apply(get_author_info)
-        print(self.df["authors_details"].iloc[0])
         mask_affiliazioni = self.df["authors_details"].apply(
             lambda lista_autori: any(autore.get("first_affiliation") is not None for autore in lista_autori)
         )
-        print(mask_affiliazioni)
         self.df = self.df[mask_affiliazioni]
         print("after_authors_details:",len(self.df))
 
-    def _cleanup_temp_columns(self):
-        pass
-
     def _save_cleaned_data(self):
-        pass
+        self.df.to_parquet(self.output_path, index=False)
 
     def _generate_report(self):
         pass
@@ -172,6 +166,4 @@ if __name__ == '__main__':
     df_clean = cleaner.clean(
         remove_no_authors=True
     )
-
-    print(f"\n✅ Final dataset ready: {len(df_clean):,} papers")
-    print(f"   Saved to: Raw/scraped_data_cleaned.parquet")
+    print(f"Saved")
