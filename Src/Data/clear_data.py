@@ -1,10 +1,7 @@
-from unittest.mock import inplace
-
 import pandas as pd
 import numpy as np
 from pathlib import Path
 import json
-
 from pyparsing import empty
 
 
@@ -24,35 +21,18 @@ class CleanData:
             'no_authors': []
         }
 
-    def clean(self, remove_issn_invalid=False, remove_no_authors=False):
+    def clean(self, remove_no_authors=False):
         print(f"Initial dataset: {len(self.df):,} papers\n")
 
-        # Step 1: Rimuovi duplicati
         self._remove_duplicates()
-
-        # Step 2: Rimuovi anni invalidi
         self._remove_invalid_years()
-
-        # Step 3: Rimuovi abstract problematici
         self._remove_bad_abstracts()
-
-        # Step 4: Rimuovi non-English
         self._remove_non_english()
-
-        # Step 5 (Opzionale): ISSN invalidi
         self._remove_invalid_issn()
-
-        # Step 6 (Opzionale): Paper senza autori
         if remove_no_authors:
             self._remove_papers_without_authors()
-
-        # Cleanup temporary columns
         self._cleanup_temp_columns()
-
-        # Save
         self._save_cleaned_data()
-
-        # Report
         self._generate_report()
 
 
@@ -137,9 +117,42 @@ class CleanData:
         self.df = self.df[filter_mask]
         print("after_issn:", len(self.df))
 
-
+    """
+        check authors and affiliation
+    """
     def _remove_papers_without_authors(self):
-        pass
+        def get_author_info(authorships_list):
+            if not isinstance(authorships_list, (list, np.ndarray)) or len(authorships_list) == 0:
+                return []
+            authors_info = []
+            for author_data in authorships_list:
+                if isinstance(author_data, dict):
+                    name = author_data.get("raw_author_name")
+                    if pd.notna(name) and name.strip() != "":
+                        affiliations = author_data.get("affiliations")
+                        first_aff = None
+                        if isinstance(affiliations, (list, np.ndarray)) and len(affiliations) > 0:
+                            for affiliation in affiliations:
+                                aff_name = affiliation.get("raw_affiliation_string")
+                                if pd.notna(aff_name) and aff_name != "":
+                                    first_aff = aff_name
+                                    break
+
+                        authors_info.append({
+                            "name": name.strip(),
+                            "first_affiliation": first_aff
+                        })
+            return authors_info
+
+        self.df["authors_details"] = self.df["authorships"].apply(get_author_info)
+        print(self.df["authors_details"].iloc[0])
+        mask_affiliazioni = self.df["authors_details"].apply(
+            lambda lista_autori: any(autore.get("first_affiliation") is not None for autore in lista_autori)
+        )
+        print(mask_affiliazioni)
+        self.df = self.df[mask_affiliazioni]
+        print("after_authors_details:",len(self.df))
+
     def _cleanup_temp_columns(self):
         pass
 
@@ -157,8 +170,7 @@ if __name__ == '__main__':
     )
 
     df_clean = cleaner.clean(
-        remove_issn_invalid=False,
-        remove_no_authors=False
+        remove_no_authors=True
     )
 
     print(f"\n✅ Final dataset ready: {len(df_clean):,} papers")
