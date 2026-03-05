@@ -34,11 +34,9 @@ class CleanData:
         self._save_cleaned_data()
         self._generate_report()
 
-
         print(f"   Initial: {self.initial_count:,} papers")
         print(f"   Final:   {len(self.df):,} papers")
-        print(
-            f"   Removed: {self.initial_count - len(self.df):,} papers ({((self.initial_count - len(self.df)) / self.initial_count * 100):.2f}%)")
+        print(f"   Removed: {self.initial_count - len(self.df):,} papers ({((self.initial_count - len(self.df)) / self.initial_count * 100):.2f}%)")
         return self.df
 
     def _remove_duplicates(self):
@@ -151,7 +149,7 @@ class CleanData:
         print("after_authors_details:",len(self.df))
 
     def _save_cleaned_data(self):
-        self.df.to_parquet(self.output_path, index=False)
+        self.df.to_json(self.output_path, orient="records", lines=True)
 
     def _generate_report(self):
         pass
@@ -159,7 +157,7 @@ class CleanData:
 if __name__ == '__main__':
     cleaner = CleanData(
         input_parquet_path="Raw/scraped_data.parquet",
-        output_parquet_path="Raw/scraped_data_cleaned.parquet",
+        output_parquet_path="Raw/scraped_data_cleaned.json",
         report_path="Raw/cleaning_report.json"
     )
 

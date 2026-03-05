@@ -476,7 +476,7 @@ class PlotData:
         self.plot_top_concepts()
         self.plot_concept_coverage()
         self.plot_language_distribution()
-        self.generate_text_report()
+        self.generate_text_report(str(self.output_dir) + "data_report.txt")
         self.plot_nan_value()
         self.plot_authors_distribution()
         print("FINISHED")
