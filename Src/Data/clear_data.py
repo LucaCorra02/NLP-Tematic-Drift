@@ -8,7 +8,7 @@ from pyparsing import empty
 class CleanData:
     def __init__(self, input_parquet_path, output_path, report_path=None):
         assert input_parquet_path.endswith(".parquet"), "incorrect input format"
-        assert output_path.endswith(".json"), "incorrect output format"
+        assert output_path.endswith(".parquet"), "incorrect output format"
         assert report_path.endswith(".json"), "incorrect report format"
         self.input_path = Path(input_parquet_path)
         self.output_path = Path(output_path)
@@ -152,7 +152,8 @@ class CleanData:
         print("after_authors_details:",len(self.df))
 
     def _save_cleaned_data(self):
-        self.df.to_json(self.output_path, orient="records", lines=True)
+        #self.df.to_json(self.output_path, orient="records", lines=True)
+        self.df.to_parquet(self.output_path, index=False)
 
     def _generate_report(self):
         pass
@@ -160,7 +161,7 @@ class CleanData:
 if __name__ == '__main__':
     cleaner = CleanData(
         input_parquet_path="Raw/scraped_data.parquet",
-        output_path="Raw/scraped_data_cleaned.json",
+        output_path="Raw/scraped_data_cleaned.parquet",
         report_path="Raw/cleaning_report.json"
     )
 
