@@ -19,6 +19,9 @@ class ConvertData:
 class ValidateData:
     def __init__(self, input_parquet_path, output_metrics_path):
         assert input_parquet_path and output_metrics_path is not None
+        assert input_parquet_path.endswith(".parquet"), "incorrect input format"
+        assert output_metrics_path.endswith(".json"), "incorrect report format"
+
         self.input_parquet_path = input_parquet_path
         self.output_metrics_path = output_metrics_path
         self.dataframe = pd.read_parquet(self.input_parquet_path, engine='pyarrow')

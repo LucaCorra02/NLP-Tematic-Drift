@@ -6,9 +6,12 @@ from pyparsing import empty
 
 
 class CleanData:
-    def __init__(self, input_parquet_path, output_parquet_path, report_path=None):
+    def __init__(self, input_parquet_path, output_path, report_path=None):
+        assert input_parquet_path.endswith(".parquet"), "incorrect input format"
+        assert output_path.endswith(".json"), "incorrect output format"
+        assert report_path.endswith(".json"), "incorrect report format"
         self.input_path = Path(input_parquet_path)
-        self.output_path = Path(output_parquet_path)
+        self.output_path = Path(output_path)
         self.report_path = Path(report_path) if report_path else None
         self.df = pd.read_parquet(self.input_path, engine='pyarrow')
         self.initial_count = len(self.df)
@@ -157,7 +160,7 @@ class CleanData:
 if __name__ == '__main__':
     cleaner = CleanData(
         input_parquet_path="Raw/scraped_data.parquet",
-        output_parquet_path="Raw/scraped_data_cleaned.json",
+        output_path="Raw/scraped_data_cleaned.json",
         report_path="Raw/cleaning_report.json"
     )
 

@@ -8,6 +8,7 @@ import re
 
 class PlotData:
     def __init__(self, metrics_json_path, output_dir="plots"):
+        assert metrics_json_path.endswith(".json"), "incorrect report format"
         with open(metrics_json_path, 'r') as f:
             self.metrics = json.load(f)
         self.output_dir = Path(output_dir)
@@ -374,7 +375,7 @@ class PlotData:
     """
         Textual Report
     """
-    def generate_text_report(self, output_path="plots/data_report.txt"):
+    def generate_text_report(self, output_path):
         report = ["=" * 80, "ATMOSPHERIC CHEMISTRY & PHYSICS - DATA VALIDATION REPORT", "=" * 80, "",
                   "DATASET OVERVIEW", "-" * 80, f"Total Papers:          {self.total_paper:>10,}",
                   f"Date Range:            {min(self.metrics['year_metrics']['year_distribution'].keys())} - {max(self.metrics['year_metrics']['year_distribution'].keys())}",
@@ -476,9 +477,9 @@ class PlotData:
         self.plot_top_concepts()
         self.plot_concept_coverage()
         self.plot_language_distribution()
-        self.generate_text_report(str(self.output_dir) + "data_report.txt")
         self.plot_nan_value()
         self.plot_authors_distribution()
+        self.generate_text_report(str(self.output_dir) + "/" + "data_report.txt")
         print("FINISHED")
 
 if __name__ == '__main__':

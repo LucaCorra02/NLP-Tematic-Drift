@@ -39,10 +39,9 @@ if __name__ == '__main__':
 
     output_cleaned_data = "Raw/scraped_data_cleaned.json"
     output_cleaned_report = "Raw/cleaning_report.json"
-
     cleaner = CleanData(
         input_parquet_path=output_scraped_data,
-        output_parquet_path=output_cleaned_data,
+        output_path=output_cleaned_data,
         report_path=output_cleaned_report
     )
     df_clean = cleaner.clean(
