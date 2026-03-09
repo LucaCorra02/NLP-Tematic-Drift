@@ -41,8 +41,18 @@ class Similtarity:
         df_result.to_parquet(str(os.path.join(self.output_dir, output_file_name)))
         return
 
-    def plot_similarity_distribution(self, input_score_path):
-        df = pd.read_parquet(input_score_path)
+class PlotSimilarity:
+    def __init__(self, score_input_path, abstract_input_path, scope_embedding_path, output_dir):
+        self.output_dir = output_dir
+        os.makedirs(self.output_dir, exist_ok=True)
+        self.df_abstract = pd.read_parquet(abstract_input_path, engine='pyarrow')
+        self.df_score = pd.read_parquet(score_input_path, engine='pyarrow')
+        self.df_merged = pd.merge(self.df_score, self.df_abstract[['id', 'publication_year']], on='id', how='left')
+        assert self.df_merged.isna().sum().sum() == 0, "nan values"
+        self.df_scope = pd.read_parquet(scope_embedding_path, engine='pyarrow')
+
+    def plot_similarity_distribution(self):
+        df = self.df_score
         scores_col = df.loc[:,'score_scope-1':]
         df["mean_scores"] = scores_col.mean(axis=1)
         data = df["mean_scores"]
@@ -50,12 +60,14 @@ class Similtarity:
         plt.xlabel("Values")
         plt.ylabel("Frequency")
         plt.title("Score Distribution")
-        plt.savefig(self.output_dir + "distribution.png")
-
-
+        plt.savefig(self.output_dir + "/distribution.png")
 
 if __name__ == "__main__":
     similarity = Similtarity("Emb/normalize_embedding.parquet", "Emb/scope_embeddings.parquet", "Similarity")
     similarity.calculate_cosine_similarity("similarity.parquet")
-    similarity.plot_similarity_distribution("Similarity/similarity.parquet")
 
+    plotsim = PlotSimilarity(
+        "Similarity/similarity.parquet", "../Data/Raw/scraped_data_cleaned.parquet",
+        "Emb/scope_embeddings.parquet", "Similarity"
+    )
+    plotsim.plot_similarity_distribution()
