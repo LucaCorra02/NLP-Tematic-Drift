@@ -1,3 +1,5 @@
+import json
+
 from transformers import AutoTokenizer
 from adapters import AutoAdapterModel
 import pandas as pd
@@ -55,9 +57,10 @@ class Embedder:
             return text
         return [parse_string(text) for text in batch_abs]
 
-    def load_data(self):
+    def load_data(self, output_file_name):
+        assert output_file_name.endswith(".parquet"), "input incorrect format"
         parquet_file = pq.ParquetFile(self.input_parquet)
-        output_file = os.path.join(self.output_dir, "normalize_embedding.parquet")
+        output_file = os.path.join(self.output_dir, output_file_name)
         parquet_writer = None
         cont_batch = 0
         with torch.no_grad():
@@ -91,15 +94,69 @@ class Embedder:
                 if parquet_writer is None:
                     parquet_writer = pq.ParquetWriter(str(output_file), table.schema)
                 parquet_writer.write_table(table)
-                print("Batch: ", cont_batch * self.batch_size)
+                print(f"Batch: {cont_batch}, records {cont_batch*self.batch_size} ")
                 cont_batch+=1
 
             if parquet_writer:
                 parquet_writer.close()
 
+    @staticmethod
+    def __read_scope(input_file_path):
+        with open(input_file_path) as f:
+            ids = []
+            title = []
+            text = []
+            fp = json.load(f)
+            for key in fp:
+                ids.append(key)
+                title.append(fp[key]["title"])
+                text.append(fp[key]["text"])
+        return pd.DataFrame({
+            'id': ids,
+            'title': title,
+            'text': text
+        })
+
+    def create_emb_scope(self, input_file_path ,output_file_name):
+        assert output_file_name.endswith(".parquet"), "input incorrect format"
+        df_scope = self.__read_scope(input_file_path)
+        ids = []
+        embeddings_ris = []
+        with torch.no_grad():
+            for index, row in df_scope.iterrows():
+                parsed_text = Embedder._parse_abstract([row["text"]])
+                complete_text = row["title"] + self.tokenizer.sep_token + parsed_text[0]
+                inputs = self.tokenizer(complete_text, padding=True, truncation=True,
+                                        return_tensors="pt", return_token_type_ids=False, max_length=512)
+
+                if self.ADAPTER_NAME not in (self.model.active_adapters or []):
+                    print(f"Not active adapters")
+                    return
+
+                output = self.model(**inputs)
+                embeddings_CLS = output.last_hidden_state[:, 0, :]
+                embeddings = list(F.normalize(embeddings_CLS, p=2, dim=1).cpu().numpy())
+                ids.append(row["id"])
+                embeddings_ris.append(embeddings[0])
+
+        df_ris = pd.DataFrame({
+            'id': ids,
+            'embeddings': embeddings_ris
+        })
+        output_file = os.path.join(self.output_dir, output_file_name)
+        df_ris.to_parquet(str(output_file))
+        return
+
 
 if __name__ == "__main__":
     model = Embedder("../Data/Raw/scraped_data_cleaned.parquet", "Emb", 20)
-    model.load_data()
-    #df = pd.read_parquet("Emb/dataset_streaming.parquet", engine='pyarrow')
-    #print(df)
+    output_embeddings_path = "Emb/normalize_embedding.parquet"
+    if not os.path.exists(output_embeddings_path):
+        model.load_data(output_embeddings_path)
+
+    model.create_emb_scope("scope.json", "scope_embeddings.parquet")
+
+    df = pd.read_parquet("Emb/normalize_embedding.parquet", engine='pyarrow')
+    print(df)
+    df = pd.read_parquet("Emb/scope_embeddings.parquet", engine='pyarrow')
+    print(df)
