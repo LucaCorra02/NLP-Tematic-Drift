@@ -141,7 +141,7 @@ class Embedder:
 
         df_ris = pd.DataFrame({
             'id': ids,
-            'embeddings': embeddings_ris
+            'embedding': embeddings_ris
         })
         output_file = os.path.join(self.output_dir, output_file_name)
         df_ris.to_parquet(str(output_file))
@@ -152,7 +152,7 @@ if __name__ == "__main__":
     model = Embedder("../Data/Raw/scraped_data_cleaned.parquet", "Emb", 20)
     output_embeddings_path = "Emb/normalize_embedding.parquet"
     if not os.path.exists(output_embeddings_path):
-        model.load_data(output_embeddings_path)
+        model.load_data("normalize_embedding.parquet")
 
     model.create_emb_scope("scope.json", "scope_embeddings.parquet")
 
