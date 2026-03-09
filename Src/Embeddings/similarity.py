@@ -80,6 +80,27 @@ class PlotSimilarity:
         ax.tick_params(axis='x', rotation=45)
         fig.savefig(self.output_dir + "/trend.png")
 
+    # TODO fixare metodo deprecato
+    def plot_year_similarity(self):
+        df = self.df_merged
+
+        df["mean_scores"] = df.filter(like="score_").mean(axis=1)
+        years = sorted(df["publication_year"].astype(int).unique())
+        data_to_plot = [
+            df[df["publication_year"] == y]["mean_scores"].dropna()
+            for y in years
+        ]
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.boxplot(data_to_plot, labels=years, patch_artist=True)
+        ax.set(xlabel='Year', ylabel='Mean Scores Distribution',
+               title='Similarity Distribution per Year')
+        ax.grid(axis='y', linestyle='--', alpha=0.7)
+
+        ax.tick_params(axis='x', rotation=45)
+        plt.tight_layout()
+        fig.savefig(self.output_dir + "/trend_boxplot.png")
+        plt.show()
+
 if __name__ == "__main__":
     similarity = Similtarity("Emb/normalize_embedding.parquet", "Emb/scope_embeddings.parquet", "Similarity")
     similarity.calculate_cosine_similarity("similarity.parquet")
