@@ -1,32 +1,22 @@
 {
-  "scope-1": [
-    {
-      "Title": "Gases",
-      "Text": "Atmospheric chemical processes and composition, chemical kinetics, radical chemistry, thermodynamics and mechanisms. Reactive trace and greenhouse gases, including budgets and trends, radiative effects, interactions with the biosphere, terrestrial and marine systems and effects on climate. Gas interactions with aerosol particles and clouds. Anthropogenic and natural emissions and developments of new or improved emission inventories where the effect on the atmosphere is demonstrated."
-    }
-  ],
-  "scope-2": [
-    {
-      "Title": "Aerosols",
-      "Text": "Aerosol properties, including microphysical properties, chemical composition and optical properties. Aerosol processes, including aerosol microphysics and chemistry. Aerosol effects on climate and the Earth system, including radiative forcing and effects on clouds and atmospheric dynamics. Emissions, including natural emission processes and developments of new or improved emission inventories where the effect on the atmosphere is demonstrated."
-    }
-  ],
-  "scope-3": [
-    {
-      "Title": "Clouds and precipitation",
-      "Text": "Cloud microphysics, including ice nucleation, cloud droplet formation and precipitation. Cloud chemistry, including aqueous phase reactions and the effects of clouds on atmospheric composition. Cloud dynamics, including cloud formation processes and the interaction of clouds with atmospheric dynamics. Aerosol-cloud interactions, including aerosol effects on cloud microphysics, precipitation and radiation. Cloud-climate interactions, including effects on radiative forcing and feedbacks."
-    }
-  ],
-  "scope-4": [
-    {
-      "Title": "Dynamics",
-      "Text": "Large-scale circulation of the troposphere, stratosphere and mesosphere. Weather system dynamics, including the evolution and behaviour of cyclones and fronts. Mesoscale and boundary-layer dynamics. Interaction of dynamics with atmospheric constituents, including clouds, precipitation, aerosols and gases. Transport and dispersion of atmospheric constituents, including trace gases, aerosols and water vapour."
-    }
-  ],
-  "scope-5":[
-    {
-      "Title": "Climate and Earth system",
-      "Text": "Radiative forcing, rapid adjustments, Earth's energy imbalance, climate feedback processes, climate sensitivity, and polar amplification. Interactions among atmospheric composition, aerosols, clouds, radiation, and their links to large-scale climate impacts.  The atmospheric hydrological cycle, including water vapour transport and precipitation. Climate dynamics and teleconnections, climate variability, extremes and trends in the past, present, and future. Climate modification (geoengineering) involving atmospheric processes. Interactions of the atmosphere and its constituents with the ocean, land, cryosphere and biosphere."
-    }
-  ]
+  "scope-1": {
+      "title": "Gases",
+      "text": "Atmospheric chemical processes and composition, chemical kinetics, radical chemistry, thermodynamics and mechanisms. Reactive trace and greenhouse gases, including budgets and trends, radiative effects, interactions with the biosphere, terrestrial and marine systems and effects on climate. Gas interactions with aerosol particles and clouds. Anthropogenic and natural emissions and developments of new or improved emission inventories where the effect on the atmosphere is demonstrated."
+  },
+  "scope-2": {
+      "title": "Aerosols",
+      "text": "Aerosol properties, including microphysical properties, chemical composition and optical properties. Aerosol processes, including aerosol microphysics and chemistry. Aerosol effects on climate and the Earth system, including radiative forcing and effects on clouds and atmospheric dynamics. Emissions, including natural emission processes and developments of new or improved emission inventories where the effect on the atmosphere is demonstrated."
+  },
+  "scope-3": {
+      "title": "Clouds and precipitation",
+      "text": "Cloud microphysics, including ice nucleation, cloud droplet formation and precipitation. Cloud chemistry, including aqueous phase reactions and the effects of clouds on atmospheric composition. Cloud dynamics, including cloud formation processes and the interaction of clouds with atmospheric dynamics. Aerosol-cloud interactions, including aerosol effects on cloud microphysics, precipitation and radiation. Cloud-climate interactions, including effects on radiative forcing and feedbacks."
+  },
+  "scope-4": {
+      "title": "Dynamics",
+      "text": "Large-scale circulation of the troposphere, stratosphere and mesosphere. Weather system dynamics, including the evolution and behaviour of cyclones and fronts. Mesoscale and boundary-layer dynamics. Interaction of dynamics with atmospheric constituents, including clouds, precipitation, aerosols and gases. Transport and dispersion of atmospheric constituents, including trace gases, aerosols and water vapour."
+  },
+  "scope-5": {
+      "title": "Climate and Earth system",
+      "text": "Radiative forcing, rapid adjustments, Earth's energy imbalance, climate feedback processes, climate sensitivity, and polar amplification. Interactions among atmospheric composition, aerosols, clouds, radiation, and their links to large-scale climate impacts.  The atmospheric hydrological cycle, including water vapour transport and precipitation. Climate dynamics and teleconnections, climate variability, extremes and trends in the past, present, and future. Climate modification (geoengineering) involving atmospheric processes. Interactions of the atmosphere and its constituents with the ocean, land, cryosphere and biosphere."
+  }
 }
