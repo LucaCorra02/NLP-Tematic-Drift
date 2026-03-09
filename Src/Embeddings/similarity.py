@@ -2,6 +2,7 @@ import pandas as pd
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 
 class Similtarity:
     def __init__(self, abstract_embedding_path, scope_embedding_path, output_dir):
@@ -62,6 +63,23 @@ class PlotSimilarity:
         plt.title("Score Distribution")
         plt.savefig(self.output_dir + "/distribution.png")
 
+    def plot_year_similarity(self):
+        df = self.df_merged
+        df["mean_scores"] = df.filter(like="score_").mean(axis=1)
+        mean_per_year = df.groupby("publication_year")["mean_scores"].mean()
+        years = [year for year in mean_per_year.keys()]
+        mean = [mean_per_year[year] for year in mean_per_year.keys()]
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.plot(years, mean, marker='o', linestyle='-')
+        ax.set(xlabel='Year', ylabel='Mean Score',
+               title='Similarity trend')
+        ax.grid()
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+        ax.set_xticks(years)
+        ax.tick_params(axis='x', rotation=45)
+        fig.savefig(self.output_dir + "/trend.png")
+
 if __name__ == "__main__":
     similarity = Similtarity("Emb/normalize_embedding.parquet", "Emb/scope_embeddings.parquet", "Similarity")
     similarity.calculate_cosine_similarity("similarity.parquet")
@@ -71,3 +89,4 @@ if __name__ == "__main__":
         "Emb/scope_embeddings.parquet", "Similarity"
     )
     plotsim.plot_similarity_distribution()
+    plotsim.plot_year_similarity()
