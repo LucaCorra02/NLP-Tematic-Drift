@@ -3,7 +3,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from sympy.physics.units import years
+from sklearn.metrics.pairwise import cosine_similarity
 
 
 class Similtarity:
@@ -127,6 +127,34 @@ class PlotSimilarity:
         plt.tight_layout()
         plt.savefig(self.output_dir + "/trend_single_scope.png")
 
+    def plot_heat_matrix_embedding(self):
+        df = self.df_merged
+        years = sorted(df["publication_year"].unique().tolist())
+
+        centroid = df.groupby("publication_year")["embedding"].mean()
+        emb_matrix = np.vstack(centroid.values)
+        score_matrix = cosine_similarity(emb_matrix)
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        im = ax.imshow(score_matrix)
+        ax.set_xticks(range(len(years)), labels=years,
+                      rotation=45, ha="right", rotation_mode="anchor")
+        ax.set_yticks(range(len(years)), labels=years)
+
+        """
+        for i in range(len(years)):
+            for j in range(len(years)):
+                text = ax.text(j, i, round(score_matrix[i, j],2),
+                               ha="center", va="center", color="w")
+        """
+
+        cbar = fig.colorbar(im, ax=ax)
+        cbar.set_label("Similarity Score", rotation=270, labelpad=15)
+        ax.set_title("Embedding Centroid per Year")
+        fig.tight_layout()
+        plt.savefig(self.output_dir + "/heat_map.png")
+
+
 
 if __name__ == "__main__":
     similarity = Similtarity("Emb/normalize_embedding.parquet", "Emb/scope_embeddings.parquet", "Similarity")
@@ -140,3 +168,4 @@ if __name__ == "__main__":
     plotsim.plot_year_similarity()
     plotsim.plot_year_similarity_box()
     plotsim.plot_single_score_trend()
+    plotsim.plot_heat_matrix_embedding()
