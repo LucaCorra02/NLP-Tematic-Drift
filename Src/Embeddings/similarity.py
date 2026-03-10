@@ -154,6 +154,30 @@ class PlotSimilarity:
         fig.tight_layout()
         plt.savefig(self.output_dir + "/heat_map.png")
 
+    def heat_map_v2(self):
+        df = self.df_merged
+        years = sorted(df["publication_year"].unique().tolist())
+        global_centroid = df["embedding"].mean()
+        centroid = df.groupby("publication_year")["embedding"].mean()
+
+        diff_centroid = [cent - global_centroid for cent in centroid.values]
+        emb_matrix = np.vstack(diff_centroid)
+        score_matrix = cosine_similarity(emb_matrix)
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        im = ax.imshow(score_matrix)
+        ax.set_xticks(range(len(years)), labels=years,
+                      rotation=45, ha="right", rotation_mode="anchor")
+        ax.set_yticks(range(len(years)), labels=years)
+
+        cbar = fig.colorbar(im, ax=ax)
+        cbar.set_label("Similarity Score", rotation=270, labelpad=15)
+        ax.set_title("Embedding Centroid per Year")
+        fig.tight_layout()
+        plt.savefig(self.output_dir + "/heat_map_v2.png")
+
+
+
 
 
 if __name__ == "__main__":
@@ -169,3 +193,4 @@ if __name__ == "__main__":
     plotsim.plot_year_similarity_box()
     plotsim.plot_single_score_trend()
     plotsim.plot_heat_matrix_embedding()
+    plotsim.heat_map_v2()
