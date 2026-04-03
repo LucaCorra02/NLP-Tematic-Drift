@@ -212,6 +212,42 @@ class PlotSimilarity:
             centroids.append(centroid)
         return years, np.vstack(centroids)
 
+    def compute_k_mean_cosine(self, k_similar):
+        df = self.df_merged
+        years = sorted(df["publication_year"].unique().tolist())
+        ris_heatmap = {}
+
+        for year_out in years:
+            ris_heatmap[year_out] = {}
+            year_out_emb = np.vstack(df[df["publication_year"] == year_out]["embedding"].values)
+            for year_in in years:
+                if year_out == year_in:
+                    ris_heatmap[year_out][year_in] = 1.0
+                    continue
+
+                year_in_emb = np.vstack(df[df["publication_year"] == year_in]["embedding"].values)
+                distance_matrix = cosine_similarity(year_out_emb, year_in_emb)
+                top_k_similarities = np.sort(distance_matrix, axis=1)[:, -k_similar:]
+                mean_of_top_k_per_paper = np.mean(top_k_similarities, axis=1)
+                ris_heatmap[year_out][year_in] = np.mean(mean_of_top_k_per_paper)
+
+        df_heatmap = pd.DataFrame(ris_heatmap)
+        score_matrix = np.vstack(df_heatmap.values)
+        np.fill_diagonal(score_matrix, np.nan)
+        vmin = np.nanmin(score_matrix)
+        vmax = np.nanmax(score_matrix)
+        fig, ax = plt.subplots(figsize=(10, 6))
+        im = ax.imshow(score_matrix, cmap="YlGnBu", vmin=vmin, vmax=vmax)
+        ax.set_xticks(range(len(years)), labels=years,
+                      rotation=45, ha="right", rotation_mode="anchor")
+        ax.set_yticks(range(len(years)), labels=years)
+        cbar = fig.colorbar(im, ax=ax)
+        cbar.set_label("Similarity Score", rotation=270, labelpad=15)
+        ax.set_title("Mean Similarity")
+        fig.tight_layout()
+        plt.show()
+        return score_matrix
+
 if __name__ == "__main__":
     similarity = Similtarity("Emb/normalize_embedding.parquet", "Emb/scope_embeddings.parquet", "Similarity")
     similarity.calculate_cosine_similarity("similarity.parquet")
@@ -220,6 +256,7 @@ if __name__ == "__main__":
         "Similarity/similarity.parquet", "../Data/Raw/scraped_data_cleaned.parquet",
         "Emb/scope_embeddings.parquet", "Similarity"
     )
+    """
     plotsim.plot_similarity_distribution()
     plotsim.plot_year_similarity()
     plotsim.plot_year_similarity_box()
@@ -227,3 +264,5 @@ if __name__ == "__main__":
     plotsim.plot_heat_matrix_embedding()
     plotsim.heat_map_v2()
     plotsim.plot_umap_2d()
+    """
+    plotsim.compute_k_mean_cosine(10)
