@@ -85,15 +85,15 @@ class PlotSimilarity:
     def plot_year_similarity_box(self):
         df = self.df_merged
 
-        df["mean_scores"] = df.filter(like="score_").mean(axis=1)
+        df["max_scores"] = df.filter(like="score_").max(axis=1)
         years = sorted(df["publication_year"].astype(int).unique())
         data_to_plot = [
-            df[df["publication_year"] == y]["mean_scores"]
+            df[df["publication_year"] == y]["max_scores"]
             for y in years
         ]
         fig, ax = plt.subplots(figsize=(12, 6))
         ax.boxplot(data_to_plot, patch_artist=True, positions=years)
-        ax.set(xlabel='Year', ylabel='Mean Scores Distribution',
+        ax.set(xlabel='Year', ylabel='Max Scores Distribution',
                title='Similarity Distribution per Year')
         ax.grid(axis='y', linestyle='--', alpha=0.7)
 
