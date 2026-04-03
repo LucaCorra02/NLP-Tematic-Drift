@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from sklearn.metrics.pairwise import cosine_similarity
-
+import umap
 
 class Similtarity:
     def __init__(self, abstract_embedding_path, scope_embedding_path, output_dir):
@@ -176,9 +176,41 @@ class PlotSimilarity:
         fig.tight_layout()
         plt.savefig(self.output_dir + "/heat_map_v2.png")
 
+    def plot_umap_2d(self):
+        years, centroids_matrix = self._compute_centroids(self.df_merged)
+        mapper = umap.UMAP(
+            n_components=2,
+            random_state=42,
+            metric='cosine'
+        ).fit(centroids_matrix)
 
+        x_coords = mapper.embedding_[:, 0]
+        y_coords = mapper.embedding_[:, 1]
+        plt.figure(figsize=(10, 8))
+        scatter = plt.scatter(x_coords, y_coords, c=years, cmap='Spectral', s=100)
 
+        for i, year in enumerate(years):
+            plt.annotate(str(year), (x_coords[i], y_coords[i]),
+                         xytext=(5, 5), textcoords='offset points')
 
+        plt.plot(x_coords, y_coords, linestyle=':', alpha=0.5, color='gray')
+        plt.colorbar(scatter, label='Anno')
+        plt.title("Centroids UMAP")
+        plt.grid(True, linestyle='--', alpha=0.6)
+        plt.savefig(self.output_dir + "/UMAP.png")
+
+    """
+        Calculate centroids for each years.
+        Returns (years, centroids_matrix) with shape (N_years, 768).
+    """
+    def _compute_centroids(self, df):
+        years = sorted(df["publication_year"].unique().tolist())
+        centroids = []
+        for year in years:
+            vecs = np.vstack(df[df["publication_year"] == year]["embedding"].values)
+            centroid = vecs.mean(axis=0)
+            centroids.append(centroid)
+        return years, np.vstack(centroids)
 
 if __name__ == "__main__":
     similarity = Similtarity("Emb/normalize_embedding.parquet", "Emb/scope_embeddings.parquet", "Similarity")
@@ -194,3 +226,4 @@ if __name__ == "__main__":
     plotsim.plot_single_score_trend()
     plotsim.plot_heat_matrix_embedding()
     plotsim.heat_map_v2()
+    plotsim.plot_umap_2d()
