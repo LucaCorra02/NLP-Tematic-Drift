@@ -1,3 +1,5 @@
+import math
+
 import pandas as pd
 import os
 import numpy as np
@@ -251,6 +253,53 @@ class PlotSimilarity:
         return score_matrix
 
 
+    def heat_map_mmd(self, esp):
+        df = self.df_merged
+        years = sorted(df["publication_year"].unique().tolist())
+        n_year = len(years)
+
+        year_embeddings = {}
+        for year in years:
+            year_matrix = np.vstack(df[df["publication_year"] == year]["embedding"].values) # Embeddings matrix for every year
+            year_embeddings[year] = year_matrix
+
+        # Intra similarity for every year
+        intra_similarity = {}
+        for year, embedding_matrix in year_embeddings.items():
+            matrix = cosine_similarity(embedding_matrix, embedding_matrix)
+            matrix_no_diag = matrix.copy()
+            np.fill_diagonal(matrix_no_diag, 0)
+            intra_similarity[year] = np.sum(matrix_no_diag) / (len(matrix) * (len(matrix) - 1))
+
+        mmd_matrix = np.zeros((n_year, n_year))
+        for i, year_i in enumerate(years):
+            for j, year_j in enumerate(years):
+                if i == j:
+                    mmd_matrix[i, j] = 0.0
+                    continue
+
+                matrix_year_i = year_embeddings[year_i]
+                matrix_year_j = year_embeddings[year_j]
+                inter_similarity = np.mean(cosine_similarity(matrix_year_i, matrix_year_j))
+                # MMD^2 = SIM[Year_X] + SIM[Year_Y] - 2* SIM[Year_X, Year_Y]
+                mmd_matrix[i,j] = intra_similarity[year_i] + intra_similarity[year_j] - 2 * inter_similarity
+
+        fig, ax = plt.subplots(figsize=(12, 10))
+        im = ax.imshow(mmd_matrix, cmap="YlOrRd", aspect='auto')
+        ax.set_xticks(range(n_year), labels=years, rotation=45, ha="right")
+        ax.set_yticks(range(n_year), labels=years)
+        cbar = fig.colorbar(im, ax=ax)
+        cbar.set_label("MMD Distance", rotation=270, labelpad=20)
+        ax.set_title("Distribution Shift over Time (MMD Squared)")
+        ax.set_xlabel("Year")
+        ax.set_ylabel("Year")
+        fig.tight_layout()
+        plt.savefig(self.output_dir + "/heat_map_v2.png", dpi=300)
+        print("✅ Salvato: heat_map_mmd_v2.png")
+        plt.close()
+
+
+
 if __name__ == "__main__":
     similarity = Similtarity("Emb/normalize_embedding.parquet", "Emb/scope_embeddings.parquet", "Similarity")
     similarity.calculate_cosine_similarity("similarity.parquet")
@@ -268,4 +317,5 @@ if __name__ == "__main__":
     plotsim.heat_map_v2()
     plotsim.plot_umap_2d()
     """
-    plotsim.compute_k_mean_cosine(200)
+    #plotsim.compute_k_mean_cosine(200)
+    plotsim.heat_map_mmd(1e-20)
