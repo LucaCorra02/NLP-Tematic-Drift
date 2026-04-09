@@ -212,41 +212,44 @@ class PlotSimilarity:
             centroids.append(centroid)
         return years, np.vstack(centroids)
 
-    def compute_k_mean_cosine(self, k_similar):
+    def compute_k_mean_cosine(self, k_global_similar=500):
         df = self.df_merged
         years = sorted(df["publication_year"].unique().tolist())
-        ris_heatmap = {}
 
+        year_embeddings = {}
+        for year in years:
+            year_embeddings[year] = np.vstack(df[df["publication_year"] == year]["embedding"].values)
+        ris_heatmap = {}
         for year_out in years:
             ris_heatmap[year_out] = {}
-            year_out_emb = np.vstack(df[df["publication_year"] == year_out]["embedding"].values)
+            year_out_emb = year_embeddings[year_out]
             for year_in in years:
                 if year_out == year_in:
-                    ris_heatmap[year_out][year_in] = 1.0
+                    ris_heatmap[year_out][year_in] = np.nan
                     continue
 
-                year_in_emb = np.vstack(df[df["publication_year"] == year_in]["embedding"].values)
+                year_in_emb = year_embeddings[year_in]
                 distance_matrix = cosine_similarity(year_out_emb, year_in_emb)
-                top_k_similarities = np.sort(distance_matrix, axis=1)[:, -k_similar:]
-                mean_of_top_k_per_paper = np.mean(top_k_similarities, axis=1)
-                ris_heatmap[year_out][year_in] = np.mean(mean_of_top_k_per_paper)
+                flat_distances = distance_matrix.flatten()
+                k_actual = min(k_global_similar, len(flat_distances))
+                top_k_scores = np.sort(flat_distances)[-k_actual:]
+                ris_heatmap[year_out][year_in] = np.mean(top_k_scores)
 
         df_heatmap = pd.DataFrame(ris_heatmap)
-        score_matrix = np.vstack(df_heatmap.values)
-        np.fill_diagonal(score_matrix, np.nan)
+        score_matrix = df_heatmap.to_numpy()
+        fig, ax = plt.subplots(figsize=(10, 8))
         vmin = np.nanmin(score_matrix)
         vmax = np.nanmax(score_matrix)
-        fig, ax = plt.subplots(figsize=(10, 6))
-        im = ax.imshow(score_matrix, cmap="YlGnBu", vmin=vmin, vmax=vmax)
-        ax.set_xticks(range(len(years)), labels=years,
-                      rotation=45, ha="right", rotation_mode="anchor")
+        im = ax.imshow(score_matrix, cmap="viridis", vmin=vmin, vmax=vmax)
+        ax.set_xticks(range(len(years)), labels=years, rotation=45, ha="right", rotation_mode="anchor")
         ax.set_yticks(range(len(years)), labels=years)
         cbar = fig.colorbar(im, ax=ax)
-        cbar.set_label("Similarity Score", rotation=270, labelpad=15)
-        ax.set_title("Mean Similarity")
+        cbar.set_label(f"Top {k_global_similar} Pairs Similarity", rotation=270, labelpad=15)
+        ax.set_title("Symmetric Semantic Similarity Between Years")
         fig.tight_layout()
-        plt.show()
+        plt.savefig(self.output_dir + "/hat-,ap-k-score.png")
         return score_matrix
+
 
 if __name__ == "__main__":
     similarity = Similtarity("Emb/normalize_embedding.parquet", "Emb/scope_embeddings.parquet", "Similarity")
@@ -265,4 +268,4 @@ if __name__ == "__main__":
     plotsim.heat_map_v2()
     plotsim.plot_umap_2d()
     """
-    plotsim.compute_k_mean_cosine(10)
+    plotsim.compute_k_mean_cosine(200)
