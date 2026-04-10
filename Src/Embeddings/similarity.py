@@ -253,7 +253,7 @@ class PlotSimilarity:
         return score_matrix
 
 
-    def heat_map_mmd(self, esp):
+    def heat_map_mmd(self):
         df = self.df_merged
         years = sorted(df["publication_year"].unique().tolist())
         n_year = len(years)
@@ -294,9 +294,75 @@ class PlotSimilarity:
         ax.set_xlabel("Year")
         ax.set_ylabel("Year")
         fig.tight_layout()
-        plt.savefig(self.output_dir + "/heat_map_v2.png", dpi=300)
-        print("✅ Salvato: heat_map_mmd_v2.png")
+        plt.savefig(self.output_dir + "/heat_map.png", dpi=300)
         plt.close()
+        return year_embeddings, intra_similarity, mmd_matrix
+
+    def mmd_permutation_test(self, years_embeddings, mmd_matrix, n_permutaton):
+        n_year = len(years_embeddings)
+        pvalue_matrix = np.ones((n_year, n_year))
+
+        for i, year_i in enumerate(years_embeddings):
+            for j, year_j in enumerate(years_embeddings):
+                if i >= j: continue # skip duplicate calculus
+                mmd_val = mmd_matrix[i, j]
+                pvalue = self._p_value_test(years_embeddings[year_i], years_embeddings[year_j], mmd_val, n_permutaton)
+                pvalue_matrix[i, j] = pvalue
+                pvalue_matrix[j, i] = pvalue
+
+                sig = "***" if pvalue < 0.001 else "**" if pvalue < 0.01 else "*" if pvalue < 0.05 else "ns"
+                print(f"{year_i} v.s {year_j} -> mmd:{mmd_val}, pvalue:{pvalue} {sig}")
+
+        fig, ax = plt.subplots(figsize=(12, 10))
+        im = ax.imshow(pvalue_matrix, cmap="RdYlGn_r", vmin=0, vmax=1, aspect='auto')
+        years = sorted(years_embeddings.keys())
+        ax.set_xticks(range(n_year), labels=years, rotation=45, ha="right")
+        ax.set_yticks(range(n_year), labels=years)
+
+        for i in range(n_year):
+            for j in range(n_year):
+                val = pvalue_matrix[i, j]
+                color = "white" if val < 0.5 else "black"
+                ax.text(j, i, f'{val:.3f}',
+                        ha="center", va="center", color=color, fontsize=8, fontweight='bold')
+
+        cbar = fig.colorbar(im, ax=ax)
+        cbar.set_label("P-value", rotation=270, labelpad=20)
+        ax.set_title(f"Statistical Significance (*** p<0.001, ** p<0.01, * p<0.05)")
+        ax.set_xlabel("Year")
+        ax.set_ylabel("Year")
+        fig.tight_layout()
+        plt.savefig(self.output_dir + "/pvalue_matrix2.png", dpi=300)
+        print("✅ Salvato: pvalue_matrix2.png")
+        plt.close()
+
+    def _p_value_test(self, year_i, year_j, mmd_val, n_permutation):
+        n_i = len(year_i)
+        n_j = len(year_j)
+        total_dim = n_i + n_j
+        all_embeddings =  np.vstack([year_i, year_j]) # year_i * year_j matrix embeddings
+        similarity_matrix = cosine_similarity(all_embeddings)
+        index_list = np.arange(total_dim) # only shuffle index
+
+        mmd_count = 0
+        for perm in range(n_permutation):
+            np.random.shuffle(index_list)
+            id_i = index_list[:n_i]
+            id_j = index_list[n_i:]
+            sum_intra_i = np.sum(similarity_matrix[np.ix_(id_i, id_i)]) #ix_ create indexing
+            sum_intra_j = np.sum(similarity_matrix[np.ix_(id_j, id_j)])
+            sum_inter = np.sum(similarity_matrix[np.ix_(id_i, id_j)])
+
+            #remove diagonal values, with cosine = 1
+            mean_intra_i = (sum_intra_i - n_i)  / (n_i * (n_i - 1))
+            mean_intra_j = (sum_intra_j - n_j) / (n_j * (n_j - 1))
+            inter_sim = sum_inter / (n_i * n_j)
+            mmd_final = mean_intra_i + mean_intra_j - 2 * inter_sim
+            if mmd_final >= mmd_val:
+                mmd_count += 1
+
+        return (mmd_count + 1) / (n_permutation + 1)
+
 
 
 
@@ -318,4 +384,6 @@ if __name__ == "__main__":
     plotsim.plot_umap_2d()
     """
     #plotsim.compute_k_mean_cosine(200)
-    plotsim.heat_map_mmd(1e-20)
+    plotsim.heat_map_v2()
+    years_embeddings, intra_sim, mmd_matrix = plotsim.heat_map_mmd()
+    plotsim.mmd_permutation_test(years_embeddings, mmd_matrix, 1000)
