@@ -333,7 +333,6 @@ class PlotSimilarity:
         ax.set_ylabel("Year")
         fig.tight_layout()
         plt.savefig(self.output_dir + "/pvalue_matrix2.png", dpi=300)
-        print("✅ Salvato: pvalue_matrix2.png")
         plt.close()
 
     def _p_value_test(self, year_i, year_j, mmd_val, n_permutation):
@@ -374,7 +373,6 @@ if __name__ == "__main__":
         "Similarity/similarity.parquet", "../Data/Raw/scraped_data_cleaned.parquet",
         "Emb/scope_embeddings.parquet", "Similarity"
     )
-    """
     plotsim.plot_similarity_distribution()
     plotsim.plot_year_similarity()
     plotsim.plot_year_similarity_box()
@@ -382,8 +380,6 @@ if __name__ == "__main__":
     plotsim.plot_heat_matrix_embedding()
     plotsim.heat_map_v2()
     plotsim.plot_umap_2d()
-    """
-    #plotsim.compute_k_mean_cosine(200)
-    plotsim.heat_map_v2()
+    plotsim.compute_k_mean_cosine(200)
     years_embeddings, intra_sim, mmd_matrix = plotsim.heat_map_mmd()
-    plotsim.mmd_permutation_test(years_embeddings, mmd_matrix, 1000)
+    #plotsim.mmd_permutation_test(years_embeddings, mmd_matrix, 1000)
