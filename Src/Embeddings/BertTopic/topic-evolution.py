@@ -28,6 +28,7 @@ class TopicEvolution:
             vectorizer_model=vectorizer_model,
             umap_model=umap_model,
             hdbscan_model=hdbscan_model,
+            calculate_probabilities=True
         )
         print(len(self.df_merged))
 
@@ -57,10 +58,26 @@ class TopicEvolution:
         print(topic_info_before.head(10))
         outliers_num = topic_info_before[topic_info_before["Topic"] == -1]["Count"].values[0]
         print(f"Papers with Topic -1: {outliers_num} / {len(abstract)}")
+        self.reduce_outliers(abstract, topics, probs, embeddings)
 
-        new_topics = self.model.reduce_outliers(
+        fig = self.model.visualize_documents(abstract, embeddings=embeddings, hide_document_hover=False,
+                                             hide_annotations=True)
+        fig.write_image("mappa_documenti.jpeg")
+        fig = self.model.visualize_heatmap()
+        fig.write_image("heatmap_documenti.jpeg")
+        print("Saved graphics")
+
+    def reduce_outliers(self, abstract, topics, probs, embeddings):
+        topics_step_1 = self.model.reduce_outliers(
             abstract,
             topics,
+            probabilities=probs,
+            strategy="probabilities",
+            threshold=0.05
+        )
+        new_topics = self.model.reduce_outliers(
+            abstract,
+            topics_step_1,
             strategy="embeddings",
             embeddings=embeddings
         )
@@ -73,11 +90,6 @@ class TopicEvolution:
         if -1 in topic_info_after["Topic"].values:
             outliers_num = topic_info_after[topic_info_after["Topic"] == -1]["Count"].values[0]
         print(f"After outliers removal: {outliers_num} / {len(abstract)}")
-
-        fig = self.model.visualize_documents(abstract, embeddings=embeddings, hide_document_hover=False,
-                                             hide_annotations=True)
-        fig.write_image("mappa_documenti.jpeg")
-        print("Saved graphic")
 
 
 if __name__ == "__main__":
