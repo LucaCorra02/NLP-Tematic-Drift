@@ -1,12 +1,15 @@
 import pandas as pd
 from bertopic import BERTopic
 import numpy as np
+from scipy.signal import coherence
 from tqdm import auto
 from sklearn.feature_extraction.text import CountVectorizer
 import html
 import re
 from umap import UMAP
 from hdbscan import HDBSCAN
+from gensim.corpora import Dictionary
+from gensim.models.coherencemodel import CoherenceModel
 
 
 class TopicEvolution:
@@ -19,7 +22,7 @@ class TopicEvolution:
             stop_words="english", min_df=2, ngram_range=(1, 2)
         )
         umap_model = UMAP(n_neighbors=15, n_components=5, min_dist=0.0, metric='cosine', random_state=42)
-        hdbscan_model = HDBSCAN(min_cluster_size=80, metric='euclidean', cluster_selection_method='eom',
+        hdbscan_model = HDBSCAN(min_cluster_size=50, metric='euclidean', cluster_selection_method='eom',
                                 prediction_data=True)
         self.model = BERTopic(
             language="english",
@@ -65,6 +68,8 @@ class TopicEvolution:
         fig.write_image("mappa_documenti.jpeg")
         fig = self.model.visualize_heatmap()
         fig.write_image("heatmap_documenti.jpeg")
+        fig = self.model.visualize_hierarchy()
+        fig.write_image("hierarchy_documenti.jpeg")
         print("Saved graphics")
 
     def reduce_outliers(self, abstract, topics, probs, embeddings):
@@ -75,14 +80,15 @@ class TopicEvolution:
             strategy="probabilities",
             threshold=0.05
         )
+        """
         new_topics = self.model.reduce_outliers(
             abstract,
             topics_step_1,
             strategy="embeddings",
             embeddings=embeddings
         )
-        self.model.update_topics(abstract, topics=new_topics, vectorizer_model=self.model.vectorizer_model)
-
+        """
+        self.model.update_topics(abstract, topics= topics_step_1 , vectorizer_model=self.model.vectorizer_model)
         print("After outliers removal")
         topic_info_after = self.model.get_topic_info()
         print(topic_info_after.head(10))
@@ -90,6 +96,40 @@ class TopicEvolution:
         if -1 in topic_info_after["Topic"].values:
             outliers_num = topic_info_after[topic_info_after["Topic"] == -1]["Count"].values[0]
         print(f"After outliers removal: {outliers_num} / {len(abstract)}")
+
+        topics_words, diversity = self.calculate_diversity()
+        coherence = self.calculate_coherence(topics_words, abstract)
+        print(diversity, coherence)
+
+        return diversity, coherence
+
+    def calculate_diversity(self):
+        topic_info = self.model.get_topic_info()
+        topics_words = []
+        all_words = []
+        for topic in topic_info['Topic']:
+            if topic != -1:
+                words = [word for word, _ in self.model.get_topic(topic)]
+                topics_words.append(words)
+                all_words.extend(words)
+
+        unique_words = set(all_words)
+        diversity = len(unique_words) / len(all_words) if all_words else 0
+        print(f"Topic Diversity: {diversity:.4f}")
+        return topics_words, diversity
+
+    def calculate_coherence(self, topics_words, abstract_list):
+        tokenized_docs = [doc.split() for doc in abstract_list]
+        dictionary = Dictionary(tokenized_docs)
+        cm = CoherenceModel(
+            topics=topics_words,
+            texts=tokenized_docs,
+            dictionary=dictionary,
+            coherence='c_v'
+        )
+        coherence = cm.get_coherence()
+        print(f"Topic Coherence: {coherence:.4f}")
+        return coherence
 
 
 if __name__ == "__main__":
