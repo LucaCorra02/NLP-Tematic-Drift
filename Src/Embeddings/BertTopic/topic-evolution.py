@@ -19,7 +19,7 @@ class TopicEvolution:
             stop_words="english", min_df=2, ngram_range=(1, 2)
         )
         umap_model = UMAP(n_neighbors=15, n_components=5, min_dist=0.0, metric='cosine', random_state=42)
-        hdbscan_model = HDBSCAN(min_cluster_size=200, metric='euclidean', cluster_selection_method='eom',
+        hdbscan_model = HDBSCAN(min_cluster_size=80, metric='euclidean', cluster_selection_method='eom',
                                 prediction_data=True)
         self.model = BERTopic(
             language="english",
@@ -50,14 +50,35 @@ class TopicEvolution:
         abstract = [self._parse_string(abs) for abs in df["abstract"].tolist()]
         embeddings = np.vstack(df["embedding"].values)
         years = df["publication_year"].tolist()
-
         topics, probs = self.model.fit_transform(abstract, embeddings=embeddings)
-        new_topics = self.model.reduce_outliers(abstract, topics)
-        self.model.visualize_documents(abstract, embeddings=embeddings,
-                                        hide_document_hover=True, hide_annotations=True)
 
-        #topic_info = self.model.get_topic_info()
-        #topics_over_time = self.model.topics_over_time(abstract, years, global_tuning=True)
+        print("Before Outlier step")
+        topic_info_before = self.model.get_topic_info()
+        print(topic_info_before.head(10))
+        outliers_num = topic_info_before[topic_info_before["Topic"] == -1]["Count"].values[0]
+        print(f"Papers with Topic -1: {outliers_num} / {len(abstract)}")
+
+        new_topics = self.model.reduce_outliers(
+            abstract,
+            topics,
+            strategy="embeddings",
+            embeddings=embeddings
+        )
+        self.model.update_topics(abstract, topics=new_topics, vectorizer_model=self.model.vectorizer_model)
+
+        print("After outliers removal")
+        topic_info_after = self.model.get_topic_info()
+        print(topic_info_after.head(10))
+        outliers_num = 0
+        if -1 in topic_info_after["Topic"].values:
+            outliers_num = topic_info_after[topic_info_after["Topic"] == -1]["Count"].values[0]
+        print(f"After outliers removal: {outliers_num} / {len(abstract)}")
+
+        fig = self.model.visualize_documents(abstract, embeddings=embeddings, hide_document_hover=False,
+                                             hide_annotations=True)
+        fig.write_image("mappa_documenti.jpeg")
+        print("Saved graphic")
+
 
 if __name__ == "__main__":
     topicEvolution = TopicEvolution("../Similarity/similarity.parquet", "../../Data/Raw/scraped_data_cleaned.parquet")
