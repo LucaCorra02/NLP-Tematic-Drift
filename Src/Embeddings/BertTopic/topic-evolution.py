@@ -1,3 +1,4 @@
+from unittest import result
 import pandas as pd
 from bertopic import BERTopic
 import numpy as np
@@ -10,11 +11,12 @@ from gensim.corpora import Dictionary
 from gensim.models.coherencemodel import CoherenceModel
 import os
 
-class TopicEvolution:
+class BertTopic:
     def __init__(self, embeding_with_score_path, abstract_embedding_path, save_model_file_name):
         self.df_abstract = pd.read_parquet(abstract_embedding_path ,engine='pyarrow')
         self.df_score = pd.read_parquet(embeding_with_score_path, engine='pyarrow')
         self.df_merged = pd.merge(self.df_score, self.df_abstract[['id', 'abstract', 'publication_year']], on='id', how='left')
+        self.df_merged["abstract"] = [self._parse_string(abs) for abs in self.df_merged["abstract"].tolist()]
         self.save_model_file_name = save_model_file_name
         assert self.df_merged.isna().sum().sum() == 0, "nan values"
         vectorizer_model = CountVectorizer(
@@ -48,6 +50,9 @@ class TopicEvolution:
         text = re.sub(r'\s+', " ", text).strip()
         return text
 
+    def get_dataframe_paper(self):
+        return self.df_merged
+
     def train_topicbert(self):
         if os.path.exists(self.save_model_file_name):
             print("Model already trained")
@@ -66,7 +71,7 @@ class TopicEvolution:
         outliers_num = topic_info_before[topic_info_before["Topic"] == -1]["Count"].values[0]
         print(f"Papers with Topic -1: {outliers_num} / {len(abstract)}")
         self.reduce_outliers(abstract, topics, probs, embeddings)
-        self.model.save(self.save_model_file_name, serialization="safetensors", save_ctfidf=True)
+        self.model.save(self.save_model_file_name, serialization="pickle", save_ctfidf=True)
 
         fig = self.model.visualize_documents(abstract, embeddings=embeddings, hide_document_hover=False,
                                              hide_annotations=True)
@@ -142,11 +147,30 @@ class TopicEvolution:
         print(f"Topic Coherence: {coherence:.4f}")
         return coherence
 
+class TopicEvolution:
+    def __init__(self, save_model_file_name, df_paper: pd.DataFrame):
+        assert  os.path.exists(save_model_file_name)
+        self.model = BERTopic.load(save_model_file_name)
+        self.df = df_paper
+        self.years = self.df["publication_year"].tolist()
+        topics_over_time = self.model.topics_over_time(self.df["abstract"], self.years)
+        self.topics_over_time_df = topics_over_time
+
+    def topic_evolution_graphic(self):
+        fig = self.model.visualize_topics_over_time(
+            self.topics_over_time_df,
+            top_n_topics=20
+        )
+        fig.show()
+        fig.write_image("topics_over_time.jpeg")
 
 if __name__ == "__main__":
-    topicEvolution = TopicEvolution(
+    bertTop = BertTopic(
         "../Similarity/similarity.parquet",
         "../../Data/Raw/scraped_data_cleaned.parquet",
         "topic_bert_parquet"
     )
-    topicEvolution.train_topicbert()
+    bertTop.train_topicbert()
+    topicEvolution = TopicEvolution("topic_bert_parquet", bertTop.get_dataframe_paper())
+    topicEvolution.topic_evolution_graphic()
+    print(topicEvolution)
