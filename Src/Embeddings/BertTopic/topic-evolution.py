@@ -1,8 +1,6 @@
 import pandas as pd
 from bertopic import BERTopic
 import numpy as np
-from scipy.signal import coherence
-from tqdm import auto
 from sklearn.feature_extraction.text import CountVectorizer
 import html
 import re
@@ -10,13 +8,14 @@ from umap import UMAP
 from hdbscan import HDBSCAN
 from gensim.corpora import Dictionary
 from gensim.models.coherencemodel import CoherenceModel
-
+import os
 
 class TopicEvolution:
-    def __init__(self, embeding_with_score_path, abstract_embedding_path):
+    def __init__(self, embeding_with_score_path, abstract_embedding_path, save_model_file_name):
         self.df_abstract = pd.read_parquet(abstract_embedding_path ,engine='pyarrow')
         self.df_score = pd.read_parquet(embeding_with_score_path, engine='pyarrow')
         self.df_merged = pd.merge(self.df_score, self.df_abstract[['id', 'abstract', 'publication_year']], on='id', how='left')
+        self.save_model_file_name = save_model_file_name
         assert self.df_merged.isna().sum().sum() == 0, "nan values"
         vectorizer_model = CountVectorizer(
             stop_words="english", min_df=2, ngram_range=(1, 2)
@@ -49,11 +48,16 @@ class TopicEvolution:
         text = re.sub(r'\s+', " ", text).strip()
         return text
 
-    def evolution(self):
+    def train_topicbert(self):
+        if os.path.exists(self.save_model_file_name):
+            print("Model already trained")
+            self.model = BERTopic.load(self.save_model_file_name)
+            return
+
         df = self.df_merged
         abstract = [self._parse_string(abs) for abs in df["abstract"].tolist()]
         embeddings = np.vstack(df["embedding"].values)
-        years = df["publication_year"].tolist()
+        #years = df["publication_year"].tolist()
         topics, probs = self.model.fit_transform(abstract, embeddings=embeddings)
 
         print("Before Outlier step")
@@ -62,6 +66,7 @@ class TopicEvolution:
         outliers_num = topic_info_before[topic_info_before["Topic"] == -1]["Count"].values[0]
         print(f"Papers with Topic -1: {outliers_num} / {len(abstract)}")
         self.reduce_outliers(abstract, topics, probs, embeddings)
+        self.model.save(self.save_model_file_name, serialization="safetensors", save_ctfidf=True)
 
         fig = self.model.visualize_documents(abstract, embeddings=embeddings, hide_document_hover=False,
                                              hide_annotations=True)
@@ -103,6 +108,9 @@ class TopicEvolution:
 
         return diversity, coherence
 
+    """
+        It measures how musch a topic use unique words from the other. It's a external cluster metrics
+    """
     def calculate_diversity(self):
         topic_info = self.model.get_topic_info()
         topics_words = []
@@ -118,6 +126,9 @@ class TopicEvolution:
         print(f"Topic Diversity: {diversity:.4f}")
         return topics_words, diversity
 
+    """
+        It measures how much a topic has coherence words. It's a internal cluster metrics 
+    """
     def calculate_coherence(self, topics_words, abstract_list):
         tokenized_docs = [doc.split() for doc in abstract_list]
         dictionary = Dictionary(tokenized_docs)
@@ -133,5 +144,9 @@ class TopicEvolution:
 
 
 if __name__ == "__main__":
-    topicEvolution = TopicEvolution("../Similarity/similarity.parquet", "../../Data/Raw/scraped_data_cleaned.parquet")
-    topicEvolution.evolution()
+    topicEvolution = TopicEvolution(
+        "../Similarity/similarity.parquet",
+        "../../Data/Raw/scraped_data_cleaned.parquet",
+        "topic_bert_parquet"
+    )
+    topicEvolution.train_topicbert()
