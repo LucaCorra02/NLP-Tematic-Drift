@@ -10,6 +10,8 @@ from hdbscan import HDBSCAN
 from gensim.corpora import Dictionary
 from gensim.models.coherencemodel import CoherenceModel
 import os
+import pymannkendall as mk
+from scipy.stats import theilslopes
 
 class BertTopic:
     def __init__(self, embeding_with_score_path, abstract_embedding_path, save_model_file_name):
@@ -156,6 +158,82 @@ class TopicEvolution:
         topics_over_time = self.model.topics_over_time(self.df["abstract"], self.years)
         self.topics_over_time_df = topics_over_time
 
+    def topic_drift(self):
+        df = self.topics_over_time_df
+        papers_per_year = df.groupby("Timestamp")["Frequency"].sum()
+        df["Freq_norm"] = df.apply(
+            lambda row: row["Frequency"] / papers_per_year[row["Timestamp"]], axis=1
+        )
+        print(df)
+
+        ris = []
+        for topic_id in sorted(df["Topic"].unique()):
+            if topic_id == -1: continue
+            topic_data = df[df["Topic"] == topic_id].sort_values("Timestamp").reset_index(drop=True)
+            if len(topic_data) < 5:
+                print(f"Topic {topic_id} removed")
+                continue
+            keywords_per_year = topic_data["Words"].tolist()
+            result = self.analyze_single_topic(topic_id, topic_data, keywords_per_year)
+            print(result)
+            break
+
+
+    def analyze_single_topic(self, topic_id, topic_data: pd.DataFrame, keywords_per_year: list):
+        y_freq = topic_data["Freq_norm"].values.astype(float)
+        burstiness = self.calculate_burstiness(y_freq)
+        trend = self.calculate_trend(y_freq)
+
+        print("bur", burstiness, trend)
+        return []
+
+    """
+        Measure if a trend is monotonic
+        Formula: (sigma - mean) / (sigma + mean)
+        Range: [-1,1]
+    """
+    def calculate_burstiness(self, frequencies):
+        mean = np.mean(frequencies)
+        std = np.std(frequencies)
+        burstiness = 0.0
+        if (std + mean) > 1e-10:
+            burstiness = (std - mean) / (std + mean)
+
+        label = "Highly bursty (cometa)"
+        if burstiness < -0.5:
+            label = "Lowly bursty (semi-stable)"
+        elif burstiness < 0:
+            label = "Moderate"
+        elif burstiness < 0.5:
+            label = "Bursty"
+        return {
+            'value': burstiness,
+            'label': label
+        }
+
+    """
+        Mann-Kendall + Theil-Sen
+    """
+    def calculate_trend(self, frequencies: np.ndarray, alpha=0.05):
+        mk_ris = mk.original_test(frequencies)
+        p_val = float(mk_ris.p)
+        slope, intercept, low, high = theilslopes(frequencies, np.arange(len(frequencies)), 0.95)
+        label = "No monotonic trend"
+        if p_val < alpha: #statistically rilevant
+            if slope > 0:
+                label = "Emergent"
+            else:
+                label = "Declinign"
+
+        return {
+            'is_significant': p_val < alpha,
+            'p_value': p_val,
+            'slope': float(slope),
+            'splope_low': float(low),
+            'splope_high': float(high),
+            'label': label
+        }
+
     def topic_evolution_graphic(self):
         fig = self.model.visualize_topics_over_time(
             self.topics_over_time_df,
@@ -173,4 +251,4 @@ if __name__ == "__main__":
     bertTop.train_topicbert()
     topicEvolution = TopicEvolution("topic_bert_parquet", bertTop.get_dataframe_paper())
     topicEvolution.topic_evolution_graphic()
-    print(topicEvolution)
+    topicEvolution.topic_drift()
