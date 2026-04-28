@@ -5,8 +5,6 @@ import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 import html
 import re
-
-from sympy.codegen.cnodes import volatile
 from umap import UMAP
 from hdbscan import HDBSCAN
 from gensim.corpora import Dictionary
@@ -168,7 +166,7 @@ class TopicEvolution:
         )
         print(df)
 
-        ris = []
+        metrics = []
         for topic_id in sorted(df["Topic"].unique()):
             if topic_id == -1: continue
             topic_data = df[df["Topic"] == topic_id].sort_values("Timestamp").reset_index(drop=True)
@@ -177,8 +175,28 @@ class TopicEvolution:
                 continue
             keywords_per_year = topic_data["Words"].tolist()
             result = self.analyze_single_topic(topic_id, topic_data, keywords_per_year)
-            print(result)
-            break
+            metrics.append(result)
+
+        metrics_df = pd.DataFrame(metrics)
+        print(metrics_df)
+        threshold = self.discover_thresholds(metrics_df)
+
+        """
+        for idx, row in metrics_df.iterrows():
+            classification = self.classify_topic_lifecycle(
+                burstiness=row['burstiness'],
+                trend_p_value=row['trend_p_value'],
+                trend_slope=row['trend_slope'],
+                volatility=row['volatility'],
+                avg_jaccard=row['avg_jaccard'],
+                drift_slope=row['drift_slope'],
+                thresholds=thresholds
+            )
+        return
+        """
+        return
+
+
 
 
     def analyze_single_topic(self, topic_id, topic_data: pd.DataFrame, keywords_per_year: list):
@@ -188,8 +206,48 @@ class TopicEvolution:
         volatility = self.calculate_volatility(y_freq)
         jaccard = self.calculate_jaccard(keywords_per_year)
 
-        print("bur", burstiness, trend, volatility, jaccard)
-        return []
+        return {
+            "topic_id": topic_id,
+            "n_years": len(topic_data),
+            "freq_mean": float(np.mean(y_freq)),
+            "burstiness": burstiness["value"],
+            "significant_trend": trend["is_significant"],
+            "trend_p_val": trend["p_value"],
+            "trend_slope": trend["slope"],
+            "volatility_val": volatility["volatility_val"],
+            "direction_changes": volatility["direction_changes"],
+            "jaccard_list": jaccard["jaccard"],
+            "jaccard_mean": jaccard["jaccard_avg"],
+            "lessical_slope": jaccard["drift_slope"],
+            "n_jaccard_pairs": jaccard["pairs"]
+        }
+
+    def discover_thresholds(self, metrics: pd.DataFrame) -> dict:
+        burstiness_valid = metrics['burstiness'].dropna()
+        volatility_valid = metrics['volatility_val'].dropna()
+        jaccard_valid = metrics['jaccard_mean'].dropna()
+        drift_slope_valid = metrics['lessical_slope'].dropna()
+
+        thresholds = {
+            'burstiness_p25': float(burstiness_valid.quantile(0.25)),
+            'burstiness_p50': float(burstiness_valid.quantile(0.50)),
+            'burstiness_p75': float(burstiness_valid.quantile(0.75)),
+
+            'volatility_p25': float(volatility_valid.quantile(0.25)),
+            'volatility_p50': float(volatility_valid.quantile(0.50)),
+            'volatility_p75': float(volatility_valid.quantile(0.75)),
+
+            'jaccard_p25': float(jaccard_valid.quantile(0.25)),
+            'jaccard_p50': float(jaccard_valid.quantile(0.50)),
+            'jaccard_p75': float(jaccard_valid.quantile(0.75)),
+
+            'drift_p25': float(drift_slope_valid.quantile(0.25)),
+            'drift_p50': float(drift_slope_valid.quantile(0.50)),
+            'drift_p75': float(drift_slope_valid.quantile(0.75)),
+        }
+        print(thresholds)
+        return thresholds
+
 
     """
         Measure if a trend is monotonic
@@ -203,17 +261,7 @@ class TopicEvolution:
         if (std + mean) > 1e-10:
             burstiness = (std - mean) / (std + mean)
 
-        label = "Highly bursty (cometa)"
-        if burstiness < -0.5:
-            label = "Lowly bursty (semi-stable)"
-        elif burstiness < 0:
-            label = "Moderate"
-        elif burstiness < 0.5:
-            label = "Bursty"
-        return {
-            'value': burstiness,
-            'label': label
-        }
+        return {'value': burstiness}
 
     """
         Mann-Kendall + Theil-Sen
@@ -222,20 +270,12 @@ class TopicEvolution:
         mk_ris = mk.original_test(frequencies)
         p_val = float(mk_ris.p)
         slope, intercept, low, high = theilslopes(frequencies, np.arange(len(frequencies)), 0.95)
-        label = "No monotonic trend"
-        if p_val < alpha: #statistically rilevant
-            if slope > 0:
-                label = "Emergent"
-            else:
-                label = "Declinign"
-
         return {
             'is_significant': p_val < alpha,
             'p_value': p_val,
             'slope': float(slope),
             'splope_low': float(low),
             'splope_high': float(high),
-            'label': label
         }
 
     """
@@ -244,26 +284,15 @@ class TopicEvolution:
         Range: [0,1]
     """
     def calculate_volatility(self, frequencies: np.ndarray):
-        assert len(frequencies) == len(set(self.years))
         signs = np.sign(np.diff(frequencies))
         sign_changes = np.sign(signs)
         direction_changes = np.sum(sign_changes != 0)
 
         volatility = direction_changes / (len(frequencies) - 1)
-        label = "No volatility"
-        if volatility < 0.2:
-            label = "Stable (low oscillation)"
-        elif volatility < 0.4:
-            label = "Moderate volatility"
-        elif volatility < 0.6:
-            label = "High volatility"
-        else:
-            label = "Very high (oscillating)"
         return {
             'volatility_val': float(volatility),
             'direction_changes': int(direction_changes),
-            'total_period': len(frequencies)-1,
-            'label': label
+            'total_period': len(frequencies)-1
         }
 
     """
@@ -299,13 +328,10 @@ class TopicEvolution:
             "drift_slope": drift_slope,
         }
 
-
-
-
-    def topic_evolution_graphic(self):
+    def topic_evolution_graphic(self, top_n_topics = 20):
         fig = self.model.visualize_topics_over_time(
             self.topics_over_time_df,
-            top_n_topics=20
+            top_n_topics=top_n_topics
         )
         fig.show()
         fig.write_image("topics_over_time.jpeg")
