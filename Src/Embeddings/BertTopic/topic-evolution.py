@@ -5,6 +5,8 @@ import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 import html
 import re
+
+from sympy.codegen.cnodes import volatile
 from umap import UMAP
 from hdbscan import HDBSCAN
 from gensim.corpora import Dictionary
@@ -183,8 +185,9 @@ class TopicEvolution:
         y_freq = topic_data["Freq_norm"].values.astype(float)
         burstiness = self.calculate_burstiness(y_freq)
         trend = self.calculate_trend(y_freq)
+        volatility = self.calculate_volatility(y_freq)
 
-        print("bur", burstiness, trend)
+        print("bur", burstiness, trend, volatility)
         return []
 
     """
@@ -233,6 +236,35 @@ class TopicEvolution:
             'splope_high': float(high),
             'label': label
         }
+
+    """
+        Topic volatility, based on change of sings(direction)
+        Formula: change of sign / (tot_year - 1)
+        Range: [0,1]
+    """
+    def calculate_volatility(self, frequencies: np.ndarray):
+        assert len(frequencies) == len(set(self.years))
+        signs = np.sign(np.diff(frequencies))
+        sign_changes = np.sign(signs)
+        direction_changes = np.sum(sign_changes != 0)
+
+        volatility = direction_changes / (len(frequencies) - 1)
+        label = "No volatility"
+        if volatility < 0.2:
+            label = "Stable (low oscillation)"
+        elif volatility < 0.4:
+            label = "Moderate volatility"
+        elif volatility < 0.6:
+            label = "High volatility"
+        else:
+            label = "Very high (oscillating)"
+        return {
+            'volatility_val': float(volatility),
+            'direction_changes': int(direction_changes),
+            'total_period': len(frequencies)-1,
+            'label': label
+        }
+
 
     def topic_evolution_graphic(self):
         fig = self.model.visualize_topics_over_time(
