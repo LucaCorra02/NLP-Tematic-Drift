@@ -186,8 +186,9 @@ class TopicEvolution:
         burstiness = self.calculate_burstiness(y_freq)
         trend = self.calculate_trend(y_freq)
         volatility = self.calculate_volatility(y_freq)
+        jaccard = self.calculate_jaccard(keywords_per_year)
 
-        print("bur", burstiness, trend, volatility)
+        print("bur", burstiness, trend, volatility, jaccard)
         return []
 
     """
@@ -264,6 +265,41 @@ class TopicEvolution:
             'total_period': len(frequencies)-1,
             'label': label
         }
+
+    """
+        Formula: | A intersect B | / | A union B |
+        Range: [0,1]
+    """
+    def calculate_jaccard(self, keywords_per_year: list):
+        jaccard_list = []
+        for i in range(1, len(keywords_per_year)):
+            key_prev = set(keywords_per_year[i-1])
+            key_next = set(keywords_per_year[i])
+            intersection = len(key_prev & key_next)
+            union = len(key_prev | key_next)
+            jaccard = intersection / union if union > 0 else np.nan
+            jaccard_list.append(jaccard)
+
+        if len(jaccard_list) >= 3:
+            jaccard_array = np.array(jaccard_list)
+            drift_slope, _, _, _ = theilslopes(
+                jaccard_array,
+                np.arange(len(jaccard_array)),
+                0.95
+            )
+            avg_jaccard = np.mean(jaccard_list)
+        else:
+            drift_slope = np.nan
+            avg_jaccard = np.nan
+
+        return {
+            "jaccard": [float(v) for v in jaccard_list],
+            "jaccard_avg": avg_jaccard,
+            "pairs": len(jaccard_list),
+            "drift_slope": drift_slope,
+        }
+
+
 
 
     def topic_evolution_graphic(self):
