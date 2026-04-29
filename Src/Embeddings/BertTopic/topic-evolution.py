@@ -222,6 +222,7 @@ class TopicEvolution:
         results_df = pd.DataFrame(results)
         results_df = results_df.sort_values('lifecycle_score', ascending=False).reset_index(drop=True)
         print(results_df)
+        results_df.to_csv("result_df_tmp.csv")
         return results_df
 
     def analyze_single_topic(self, topic_id, topic_data: pd.DataFrame, keywords_per_year: list):
@@ -229,6 +230,7 @@ class TopicEvolution:
         burstiness = self.calculate_burstiness(y_freq)
         trend = self.calculate_trend(y_freq)
         volatility = self.calculate_volatility(y_freq)
+        print("KEYYY: ", keywords_per_year)
         jaccard = self.calculate_jaccard(keywords_per_year)
 
         return {
@@ -318,8 +320,9 @@ class TopicEvolution:
         mean = np.mean(frequencies)
         std = np.std(frequencies)
         burstiness = 0.0
-        if (std + mean) > 1e-10:
-            burstiness = (std - mean) / (std + mean)
+        if mean > 1e-10:
+            #burstiness = (std - mean) / (std + mean)
+            burstiness = std / mean
 
         return {'value': burstiness}
 
@@ -362,8 +365,8 @@ class TopicEvolution:
     def calculate_jaccard(self, keywords_per_year: list):
         jaccard_list = []
         for i in range(1, len(keywords_per_year)):
-            key_prev = set(keywords_per_year[i-1])
-            key_next = set(keywords_per_year[i])
+            key_prev = set([w.strip() for w in keywords_per_year[i-1].split(",") if w.strip()])
+            key_next =  set([w.strip() for w in keywords_per_year[i].split(",") if w.strip()])
             intersection = len(key_prev & key_next)
             union = len(key_prev | key_next)
             jaccard = intersection / union if union > 0 else np.nan
