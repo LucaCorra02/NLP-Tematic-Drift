@@ -179,25 +179,50 @@ class TopicEvolution:
 
         metrics_df = pd.DataFrame(metrics)
         print(metrics_df)
-        threshold = self.discover_thresholds(metrics_df)
+        thresholds = self.discover_thresholds(metrics_df)
 
-        """
+        results = []
         for idx, row in metrics_df.iterrows():
             classification = self.classify_topic_lifecycle(
-                burstiness=row['burstiness'],
-                trend_p_value=row['trend_p_value'],
-                trend_slope=row['trend_slope'],
-                volatility=row['volatility'],
-                avg_jaccard=row['avg_jaccard'],
-                drift_slope=row['drift_slope'],
+                burstiness=row["burstiness"],
+                trend_p_value=row["trend_p_val"],
+                trend_slope=row["trend_slope"],
+                volatility=row["volatility_val"],
+                avg_jaccard=row["jaccard_mean"],
+                drift_slope=row["lessical_slope"],
                 thresholds=thresholds
             )
-        return
-        """
-        return
+            result = {
+                "topic_id": int(row["topic_id"]),
+                "trend_classification": classification["trend_classification"],
+                "lifecycle_score": classification["lifecycle_score"],
+                "lexical_classification": classification["lexical_classification"],
 
+                "burstiness": row["burstiness"],
+                "burstiness_threshold": "High" if row['burstiness'] > thresholds['burstiness_p75'] else "Low",
 
+                "trend_p_val": row["trend_p_val"],
+                "trend_Slope": row["trend_slope"],
+                'significant_trend': row["significant_trend"],
 
+                "volatility_val": row["volatility_val"],
+                'Volatility_vs_P75': "High" if row['volatility_val'] > thresholds['volatility_p75'] else "Low",
+                "direction_changes": row["direction_changes"],
+
+                "avg_Jaccard": row["jaccard_mean"],
+                "Jaccard_vs_P75": "High" if not np.isnan(row["jaccard_mean"]) and row["jaccard_mean"] > thresholds[
+                    'jaccard_p75'] else "Low",
+                "lessical_slope": row["lessical_slope"],
+                "jaccard_list": row["jaccard_list"],
+                "n_years": row["n_years"],
+                "freq_mean": row["freq_mean"],
+            }
+            results.append(result)
+
+        results_df = pd.DataFrame(results)
+        results_df = results_df.sort_values('lifecycle_score', ascending=False).reset_index(drop=True)
+        print(results_df)
+        return results_df
 
     def analyze_single_topic(self, topic_id, topic_data: pd.DataFrame, keywords_per_year: list):
         y_freq = topic_data["Freq_norm"].values.astype(float)
@@ -248,6 +273,41 @@ class TopicEvolution:
         print(thresholds)
         return thresholds
 
+    def classify_topic_lifecycle( self, burstiness, trend_p_value, trend_slope, volatility, avg_jaccard, drift_slope, thresholds: dict):
+        if trend_p_value < 0.05:
+            if trend_slope > 0:
+                classification = "Emergent"
+                score = 1.0
+            else:
+                classification = "Declining"
+                score = 0.1
+        else:
+            if volatility > thresholds['volatility_p75']:
+                if burstiness > thresholds['burstiness_p75']:
+                    classification = "Episodic with spikes"
+                    score = 0.75
+                else:
+                    classification = "Roller Coster"
+                    score = 0.55
+            else:
+                classification = "Stable"
+                score = 0.4
+
+        if not np.isnan(avg_jaccard):
+            if avg_jaccard > thresholds['jaccard_p75']:
+                lexical_label = "stable keywords"
+            elif avg_jaccard > thresholds['jaccard_p25']:
+                lexical_label = "slowly changing keywords"
+            else:
+                lexical_label = "keywords are different"
+        else:
+            lexical_label = "no data"
+
+        return {
+            "trend_classification": classification,
+            "lexical_classification": lexical_label,
+            "lifecycle_score": score
+        }
 
     """
         Measure if a trend is monotonic
@@ -285,7 +345,7 @@ class TopicEvolution:
     """
     def calculate_volatility(self, frequencies: np.ndarray):
         signs = np.sign(np.diff(frequencies))
-        sign_changes = np.sign(signs)
+        sign_changes = np.diff(signs)
         direction_changes = np.sum(sign_changes != 0)
 
         volatility = direction_changes / (len(frequencies) - 1)
