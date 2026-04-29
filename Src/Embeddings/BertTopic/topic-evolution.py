@@ -12,6 +12,7 @@ from gensim.models.coherencemodel import CoherenceModel
 import os
 import pymannkendall as mk
 from scipy.stats import theilslopes
+from pathlib import Path
 
 class BertTopic:
     def __init__(self, embeding_with_score_path, abstract_embedding_path, save_model_file_name):
@@ -150,13 +151,19 @@ class BertTopic:
         return coherence
 
 class TopicEvolution:
-    def __init__(self, save_model_file_name, df_paper: pd.DataFrame):
+    def __init__(self, save_model_file_name, df_paper: pd.DataFrame, topic_over_time_path):
         assert  os.path.exists(save_model_file_name)
         self.model = BERTopic.load(save_model_file_name)
         self.df = df_paper
         self.years = self.df["publication_year"].tolist()
-        topics_over_time = self.model.topics_over_time(self.df["abstract"], self.years)
-        self.topics_over_time_df = topics_over_time
+        self.topics_over_time_path = Path(topic_over_time_path)
+        if os.path.exists(self.topics_over_time_path):
+            self.topics_over_time_df = pd.read_csv(self.topics_over_time_path / "topic_over_time.csv")
+        else:
+            topics_over_time = self.model.topics_over_time(self.df["abstract"], self.years)
+            self.topics_over_time_df = topics_over_time
+            self.topics_over_time_path.mkdir(parents=True, exist_ok=True)
+            self.topics_over_time_df.to_csv(self.topics_over_time_path / "topic_over_time.csv")
 
     def topic_drift(self):
         df = self.topics_over_time_df
@@ -178,11 +185,14 @@ class TopicEvolution:
             metrics.append(result)
 
         metrics_df = pd.DataFrame(metrics)
-        print(metrics_df)
         thresholds = self.discover_thresholds(metrics_df)
 
         results = []
         for idx, row in metrics_df.iterrows():
+            topic_id = int(row["topic_id"])
+            topic_data = df[df["Topic"] == topic_id].sort_values("Timestamp")
+            y_freq = topic_data["Freq_norm"].values.astype(float)
+
             classification = self.classify_topic_lifecycle(
                 burstiness=row["burstiness"],
                 trend_p_value=row["trend_p_val"],
@@ -190,10 +200,11 @@ class TopicEvolution:
                 volatility=row["volatility_val"],
                 avg_jaccard=row["jaccard_mean"],
                 drift_slope=row["lessical_slope"],
-                thresholds=thresholds
+                thresholds=thresholds,
+                frequencies = y_freq
             )
             result = {
-                "topic_id": int(row["topic_id"]),
+                "topic_id": topic_id,
                 "trend_classification": classification["trend_classification"],
                 "lifecycle_score": classification["lifecycle_score"],
                 "lexical_classification": classification["lexical_classification"],
@@ -221,8 +232,7 @@ class TopicEvolution:
 
         results_df = pd.DataFrame(results)
         results_df = results_df.sort_values('lifecycle_score', ascending=False).reset_index(drop=True)
-        print(results_df)
-        results_df.to_csv("result_df_tmp.csv")
+        results_df.to_csv(self.topics_over_time_path / "result_df_tmp.csv")
         return results_df
 
     def analyze_single_topic(self, topic_id, topic_data: pd.DataFrame, keywords_per_year: list):
@@ -230,7 +240,6 @@ class TopicEvolution:
         burstiness = self.calculate_burstiness(y_freq)
         trend = self.calculate_trend(y_freq)
         volatility = self.calculate_volatility(y_freq)
-        print("KEYYY: ", keywords_per_year)
         jaccard = self.calculate_jaccard(keywords_per_year)
 
         return {
@@ -275,11 +284,17 @@ class TopicEvolution:
         print(thresholds)
         return thresholds
 
-    def classify_topic_lifecycle( self, burstiness, trend_p_value, trend_slope, volatility, avg_jaccard, drift_slope, thresholds: dict):
+    def classify_topic_lifecycle( self, burstiness, trend_p_value, trend_slope, volatility, avg_jaccard, drift_slope, thresholds: dict, frequencies):
         if trend_p_value < 0.05:
             if trend_slope > 0:
-                classification = "Emergent"
-                score = 1.0
+                max_idx = np.argmax(frequencies)
+                last_idx = len(frequencies) - 1
+                if max_idx < last_idx - 2:  # peak not in last 3 years
+                    classification = "Episodic (Past Peak)"
+                    score = 0.3
+                else:
+                    classification = "Emergent"
+                    score = 1.0
             else:
                 classification = "Declining"
                 score = 0.1
@@ -398,14 +413,18 @@ class TopicEvolution:
         )
         fig.show()
         fig.write_image("topics_over_time.jpeg")
+        fig.write_html("topics_over_time.html")
 
 if __name__ == "__main__":
+    """
+        If you changes hyper-parameters remove topic_bert_parquet model and Topic_Over_Time folder. Then refit the model
+    """
     bertTop = BertTopic(
         "../Similarity/similarity.parquet",
         "../../Data/Raw/scraped_data_cleaned.parquet",
         "topic_bert_parquet"
     )
     bertTop.train_topicbert()
-    topicEvolution = TopicEvolution("topic_bert_parquet", bertTop.get_dataframe_paper())
-    topicEvolution.topic_evolution_graphic()
+    topicEvolution = TopicEvolution("topic_bert_parquet", bertTop.get_dataframe_paper(), "Topic_Over_Time")
     topicEvolution.topic_drift()
+    topicEvolution.topic_evolution_graphic()
