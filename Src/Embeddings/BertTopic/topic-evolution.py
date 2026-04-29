@@ -13,6 +13,7 @@ import os
 import pymannkendall as mk
 from scipy.stats import theilslopes
 from pathlib import Path
+import plotly.express as px
 
 class BertTopic:
     def __init__(self, embeding_with_score_path, abstract_embedding_path, save_model_file_name):
@@ -415,6 +416,55 @@ class TopicEvolution:
         fig.write_image("topics_over_time.jpeg")
         fig.write_html("topics_over_time.html")
 
+    def top_trend_graphic(self, graphic_path):
+        df_results = pd.read_csv(self.topics_over_time_path / "result_df_tmp.csv")
+        df_time = self.topics_over_time_df.copy()
+        output_dir = self.topics_over_time_path / graphic_path
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        topic_info = self.model.get_topic_info()
+        topic_names = dict(zip(topic_info['Topic'], topic_info['Name']))
+        labels = df_results['trend_classification'].unique()
+
+        for label in labels:
+            class_df = df_results[df_results['trend_classification'] == label]
+            if label == 'Emergent':
+                top_5 = class_df.sort_values(by='trend_Slope', ascending=False).head(5)
+            elif label == 'Declining':
+                top_5 = class_df.sort_values(by='trend_Slope', ascending=True).head(5)
+            elif 'Episodic' in label:
+                top_5 = class_df.sort_values(by='burstiness', ascending=False).head(5)
+            elif label == 'Roller Coster':
+                top_5 = class_df.sort_values(by='volatility_val', ascending=False).head(5)
+            else:
+                top_5 = class_df.sort_values(by='freq_mean', ascending=False).head(5)
+
+            top_5_topic_ids = top_5['topic_id'].tolist()
+            plot_data = df_time[df_time['Topic'].isin(top_5_topic_ids)].copy()
+            plot_data['Topic_Name'] = plot_data['Topic'].map(topic_names)
+
+            fig = px.line(
+                plot_data,
+                x="Timestamp",
+                y="Freq_norm",
+                color="Topic_Name",
+                markers=True,
+                title=f"Top 5 Topics: {label} (Normalized Frequency)",
+                labels={
+                    "Timestamp": "Year",
+                    "Freq_norm": "Normalized Freq (% of total papers that year)"
+                }
+            )
+            fig.update_layout(
+                template="plotly_white",
+                legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5)
+            )
+
+            clean_class_name = label.replace(" ", "_").replace("(", "").replace(")", "")
+            fig.write_html(output_dir / f"Top5_{clean_class_name}.html")
+            fig.write_image(output_dir / f"Top5_{clean_class_name}.jpeg", width=1200, height=600)
+
+   
 if __name__ == "__main__":
     """
         If you changes hyper-parameters remove topic_bert_parquet model and Topic_Over_Time folder. Then refit the model
@@ -427,4 +477,5 @@ if __name__ == "__main__":
     bertTop.train_topicbert()
     topicEvolution = TopicEvolution("topic_bert_parquet", bertTop.get_dataframe_paper(), "Topic_Over_Time")
     topicEvolution.topic_drift()
-    topicEvolution.topic_evolution_graphic()
+    #topicEvolution.topic_evolution_graphic()
+    topicEvolution.top_trend_graphic()
