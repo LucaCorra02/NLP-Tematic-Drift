@@ -14,6 +14,7 @@ import pymannkendall as mk
 from scipy.stats import theilslopes
 from pathlib import Path
 import plotly.express as px
+import plotly.graph_objects as go
 
 class BertTopic:
     def __init__(self, embeding_with_score_path, abstract_embedding_path, save_model_file_name):
@@ -416,7 +417,7 @@ class TopicEvolution:
         fig.write_image("topics_over_time.jpeg")
         fig.write_html("topics_over_time.html")
 
-    def top_trend_graphic(self, graphic_path):
+    def top_trend_graphic(self, graphic_path = "Trend_Graphic"):
         df_results = pd.read_csv(self.topics_over_time_path / "result_df_tmp.csv")
         df_time = self.topics_over_time_df.copy()
         output_dir = self.topics_over_time_path / graphic_path
@@ -427,19 +428,7 @@ class TopicEvolution:
         labels = df_results['trend_classification'].unique()
 
         for label in labels:
-            class_df = df_results[df_results['trend_classification'] == label]
-            if label == 'Emergent':
-                top_5 = class_df.sort_values(by='trend_Slope', ascending=False).head(5)
-            elif label == 'Declining':
-                top_5 = class_df.sort_values(by='trend_Slope', ascending=True).head(5)
-            elif 'Episodic' in label:
-                top_5 = class_df.sort_values(by='burstiness', ascending=False).head(5)
-            elif label == 'Roller Coster':
-                top_5 = class_df.sort_values(by='volatility_val', ascending=False).head(5)
-            else:
-                top_5 = class_df.sort_values(by='freq_mean', ascending=False).head(5)
-
-            top_5_topic_ids = top_5['topic_id'].tolist()
+            top_5_topic_ids = self.select_relevant_topic(label, df_results)
             plot_data = df_time[df_time['Topic'].isin(top_5_topic_ids)].copy()
             plot_data['Topic_Name'] = plot_data['Topic'].map(topic_names)
 
@@ -464,7 +453,71 @@ class TopicEvolution:
             fig.write_html(output_dir / f"Top5_{clean_class_name}.html")
             fig.write_image(output_dir / f"Top5_{clean_class_name}.jpeg", width=1200, height=600)
 
-   
+    def select_relevant_topic(self, label, df_results):
+        class_df = df_results[df_results["trend_classification"] == label]
+        if label == "Emergent":
+            top_5 = class_df.sort_values(by="trend_Slope", ascending=False).head(5)
+        elif label == "Declining":
+            top_5 = class_df.sort_values(by="trend_Slope", ascending=True).head(5)
+        elif "Episodic" in label:
+            top_5 = class_df.sort_values(by="burstiness", ascending=False).head(5)
+        elif label == "Roller Coster":
+            top_5 = class_df.sort_values(by="volatility_val", ascending=False).head(5)
+        else:
+            top_5 = class_df.sort_values(by="freq_mean", ascending=False).head(5)
+        return top_5["topic_id"].tolist()
+
+    def jaccard_stability_graphic(self, graphic_path = "Jaccard_Graphic"):
+        df_results = pd.read_csv(self.topics_over_time_path / "result_df_tmp.csv")
+        df_time = self.topics_over_time_df.copy()
+        output_dir = self.topics_over_time_path / graphic_path
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        topic_info = self.model.get_topic_info()
+        topic_names = dict(zip(topic_info['Topic'], topic_info['Name']))
+        labels = df_results['trend_classification'].unique()
+        for label in labels:
+            top_5_topic_ids = self.select_relevant_topic(label, df_results)
+            fig = go.Figure()
+            for topic_id in top_5_topic_ids:
+                row = df_results[df_results['topic_id'] == topic_id].iloc[0]
+                jaccard_list = eval(row['jaccard_list'])
+                topic_time_data = df_time[df_time['Topic'] == topic_id].sort_values('Timestamp')
+                years = topic_time_data['Timestamp'].tolist()
+                jaccard_years = years[1:len(jaccard_list) + 1]
+
+                topic_name = topic_names.get(int(topic_id), f"Topic {topic_id}")
+                label_name = f"{topic_name}"
+                fig.add_trace(go.Scatter(
+                    x=jaccard_years,
+                    y=jaccard_list,
+                    mode='lines+markers',
+                    name=label_name,
+                    line=dict(width=2),
+                    marker=dict(size=6),
+                    hovertemplate=label_name + "<br>Year: %{x}<br>Jaccard: %{y:.3f}<extra></extra>"
+                ))
+            fig.add_hline(y=0.6, line_dash="dash", line_color="green",
+                          annotation_text="High Stability (0.6)", annotation_position="right")
+            fig.add_hline(y=0.4, line_dash="dash", line_color="orange",
+                          annotation_text="Moderate Stability (0.4)", annotation_position="right")
+            fig.add_hline(y=0.2, line_dash="dash", line_color="red",
+                          annotation_text="Low Stability (0.2)", annotation_position="right")
+
+            fig.update_layout(
+                title=f"Lexical Stability (Jaccard Similarity): Top 5 {label}",
+                xaxis_title="Year",
+                yaxis_title="Jaccard Similarity (Year-to-Year Keywords)",
+                template="plotly_white",
+                hovermode='x unified',
+                height=600,
+                width=1200,
+                legend=dict(orientation="v", yanchor="top", y=0.99, xanchor="left", x=0.01)
+            )
+            clean_class_name = label.replace(" ", "_").replace("(", "").replace(")", "")
+            fig.write_html(output_dir / f"Jaccard_Stability_{clean_class_name}.html")
+            fig.write_image(output_dir / f"Jaccard_Stability_{clean_class_name}.jpeg", width=1200, height=600)
+
 if __name__ == "__main__":
     """
         If you changes hyper-parameters remove topic_bert_parquet model and Topic_Over_Time folder. Then refit the model
@@ -479,3 +532,4 @@ if __name__ == "__main__":
     topicEvolution.topic_drift()
     #topicEvolution.topic_evolution_graphic()
     topicEvolution.top_trend_graphic()
+    topicEvolution.jaccard_stability_graphic()
