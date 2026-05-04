@@ -518,6 +518,123 @@ class TopicEvolution:
             fig.write_html(output_dir / f"Jaccard_Stability_{clean_class_name}.html")
             fig.write_image(output_dir / f"Jaccard_Stability_{clean_class_name}.jpeg", width=1200, height=600)
 
+    def generate_atlas_bump_chart(self, top_n_words=20, num_periods=6, path_dir_bump_chart="BumpChart"):
+        df = self.topics_over_time_df.copy()
+        df = df[df['Topic'] != -1]
+        years = sorted(df['Timestamp'].unique())
+        chunk_size = max(1, len(years) // num_periods)
+
+        periods = []
+        for i in range(0, len(years), chunk_size):
+            chunk = years[i:i + chunk_size]
+            if chunk: periods.append(chunk)
+
+        if len(periods) > num_periods and len(periods) > 1:
+            periods[-2].extend(periods[-1])
+            periods.pop()
+
+        period_labels = []
+        period_ranks = {}
+        words_in_top_n_ever = set()
+        for chunk in periods:
+            label = f"{chunk[0]}-{chunk[-1]}" if len(chunk) > 1 else str(chunk[0])
+            period_labels.append(label)
+
+            df_chunk = df[df['Timestamp'].isin(chunk)]
+            word_scores = {}
+            total_chunk = df_chunk["Frequency"].sum()
+
+            for _, row in df_chunk.iterrows():
+                words = [w.strip() for w in str(row["Words"]).split(",") if w.strip()]
+                topic_weight = row["Frequency"] / total_chunk
+                for word in words:
+                    word_scores[word] = word_scores.get(word, 0.0) + topic_weight
+
+            df_words = pd.DataFrame(list(word_scores.items()), columns=['Word', 'Score'])
+            df_words = df_words.sort_values(by='Score', ascending=False)
+            print(df_words)
+            df_words['Rank'] = range(1, len(df_words) + 1)
+            for _, r in df_words.iterrows():
+                word = r['Word']
+                current_rank = r['Rank']
+                if word not in period_ranks:
+                    period_ranks[word] = {}
+                period_ranks[word][label] = current_rank
+                if current_rank <= top_n_words:
+                    words_in_top_n_ever.add(word)
+
+        fig = go.Figure()
+        colors = px.colors.qualitative.Dark24 + px.colors.qualitative.Light24
+        for i, word in enumerate(words_in_top_n_ever):
+            y_plot = []
+            valid_x = []
+            for label in period_labels:
+                rank = period_ranks[word].get(label)
+                if rank is not None and rank <= top_n_words + 2:
+                    y_plot.append(rank)
+                    valid_x.append(label)
+                else:
+                    y_plot.append(None)
+                    valid_x.append(label)
+
+            color = colors[i % len(colors)]
+            fig.add_trace(go.Scatter(
+                x=period_labels,
+                y=y_plot,
+                mode='lines+markers',
+                name=word,
+                line=dict(color=color, width=3),
+                marker=dict(size=8, color=color),
+                connectgaps=False,
+                hoverinfo='name'
+            ))
+            valid_indices = [idx for idx, val in enumerate(y_plot) if val is not None]
+            if valid_indices:
+                first_idx = valid_indices[0]
+                last_idx = valid_indices[-1]
+                if first_idx == 0 and y_plot[first_idx] <= top_n_words:
+                    fig.add_annotation(
+                        x=period_labels[0], y=y_plot[0],
+                        xshift=-15,
+                        text=f"<b>{int(y_plot[0])}</b>. {word}",
+                        showarrow=False, xanchor='right',
+                        font=dict(size=12, color='black')
+                    )
+                if last_idx == len(period_labels) - 1 and y_plot[last_idx] <= top_n_words:
+                    fig.add_annotation(
+                        x=period_labels[-1], y=y_plot[-1],
+                        xshift=15,
+                        text=f"{word} .<b>{int(y_plot[-1])}</b>",
+                        showarrow=False, xanchor='left',
+                        font=dict(size=12, color='black')
+                    )
+        fig.update_layout(
+            title="Top 20 gloabl keyword",
+            yaxis=dict(
+                autorange="reversed",
+                range=[top_n_words + 1, 0.5],
+                showgrid=False,
+                zeroline=False,
+                visible=False
+            ),
+            xaxis=dict(
+                showgrid=True,
+                gridcolor='lightgrey',
+                gridwidth=1,
+                zeroline=False,
+                side='top'
+            ),
+            showlegend=False,
+            template="plotly_white",
+            height=850,
+            width=1200,
+            margin=dict(l=180, r=180, t=100, b=50)
+        )
+        output_dir = self.topics_over_time_path / path_dir_bump_chart
+        output_dir.mkdir(parents=True, exist_ok=True)
+        fig.write_html(output_dir / "Atlas_BumpChart.html")
+        fig.write_image(output_dir / "Atlas_BumpChart.jpeg")
+
 if __name__ == "__main__":
     """
         If you changes hyper-parameters remove topic_bert_parquet model and Topic_Over_Time folder. Then refit the model
@@ -531,5 +648,6 @@ if __name__ == "__main__":
     topicEvolution = TopicEvolution("topic_bert_parquet", bertTop.get_dataframe_paper(), "Topic_Over_Time")
     topicEvolution.topic_drift()
     #topicEvolution.topic_evolution_graphic()
-    topicEvolution.top_trend_graphic()
-    topicEvolution.jaccard_stability_graphic()
+    #topicEvolution.top_trend_graphic()
+    #topicEvolution.jaccard_stability_graphic()
+    topicEvolution.generate_atlas_bump_chart(top_n_words=21, num_periods=6, path_dir_bump_chart = "BumpChart")
