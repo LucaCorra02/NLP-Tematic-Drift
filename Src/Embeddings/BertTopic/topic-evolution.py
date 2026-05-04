@@ -17,7 +17,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 class BertTopic:
-    def __init__(self, embeding_with_score_path, abstract_embedding_path, save_model_file_name):
+    def __init__(self, embeding_with_score_path, abstract_embedding_path, save_model_file_name, n_neighbors=15, min_cluster_size=50, top_n_words=10):
         self.df_abstract = pd.read_parquet(abstract_embedding_path ,engine='pyarrow')
         self.df_score = pd.read_parquet(embeding_with_score_path, engine='pyarrow')
         self.df_merged = pd.merge(self.df_score, self.df_abstract[['id', 'abstract', 'publication_year']], on='id', how='left')
@@ -27,13 +27,13 @@ class BertTopic:
         vectorizer_model = CountVectorizer(
             stop_words="english", min_df=2, ngram_range=(1, 2)
         )
-        umap_model = UMAP(n_neighbors=15, n_components=5, min_dist=0.0, metric='cosine', random_state=42)
-        hdbscan_model = HDBSCAN(min_cluster_size=50, metric='euclidean', cluster_selection_method='eom',
+        umap_model = UMAP(n_neighbors=n_neighbors, n_components=5, min_dist=0.0, metric='cosine', random_state=42)
+        hdbscan_model = HDBSCAN(min_cluster_size=min_cluster_size, metric='euclidean', cluster_selection_method='eom',
                                 prediction_data=True)
         self.model = BERTopic(
             language="english",
             verbose=True,
-            top_n_words=10,
+            top_n_words=top_n_words,
             vectorizer_model=vectorizer_model,
             umap_model=umap_model,
             hdbscan_model=hdbscan_model,
@@ -159,6 +159,7 @@ class TopicEvolution:
         self.df = df_paper
         self.years = self.df["publication_year"].tolist()
         self.topics_over_time_path = Path(topic_over_time_path)
+        self.result_metrics_csv = "df_result.csv"
         if os.path.exists(self.topics_over_time_path):
             self.topics_over_time_df = pd.read_csv(self.topics_over_time_path / "topic_over_time.csv")
         else:
@@ -234,7 +235,7 @@ class TopicEvolution:
 
         results_df = pd.DataFrame(results)
         results_df = results_df.sort_values('lifecycle_score', ascending=False).reset_index(drop=True)
-        results_df.to_csv(self.topics_over_time_path / "result_df_tmp.csv")
+        results_df.to_csv(self.topics_over_time_path / self.result_metrics_csv)
         return results_df
 
     def analyze_single_topic(self, topic_id, topic_data: pd.DataFrame, keywords_per_year: list):
@@ -418,7 +419,7 @@ class TopicEvolution:
         fig.write_html("topics_over_time.html")
 
     def top_trend_graphic(self, graphic_path = "Trend_Graphic"):
-        df_results = pd.read_csv(self.topics_over_time_path / "result_df_tmp.csv")
+        df_results = pd.read_csv(self.topics_over_time_path / self.result_metrics_csv)
         df_time = self.topics_over_time_df.copy()
         output_dir = self.topics_over_time_path / graphic_path
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -468,7 +469,7 @@ class TopicEvolution:
         return top_5["topic_id"].tolist()
 
     def jaccard_stability_graphic(self, graphic_path = "Jaccard_Graphic"):
-        df_results = pd.read_csv(self.topics_over_time_path / "result_df_tmp.csv")
+        df_results = pd.read_csv(self.topics_over_time_path / self.result_metrics_csv)
         df_time = self.topics_over_time_df.copy()
         output_dir = self.topics_over_time_path / graphic_path
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -505,9 +506,9 @@ class TopicEvolution:
                           annotation_text="Low Stability (0.2)", annotation_position="right")
 
             fig.update_layout(
-                title=f"Lexical Stability (Jaccard Similarity): Top 5 {label}",
+                title=f"Lexical Stability (Jaccard): Top 5 {label}",
                 xaxis_title="Year",
-                yaxis_title="Jaccard Similarity (Year-to-Year Keywords)",
+                yaxis_title="Jaccard Similarity (Year-to-Year)",
                 template="plotly_white",
                 hovermode='x unified',
                 height=600,
@@ -642,12 +643,15 @@ if __name__ == "__main__":
     bertTop = BertTopic(
         "../Similarity/similarity.parquet",
         "../../Data/Raw/scraped_data_cleaned.parquet",
-        "topic_bert_parquet"
+        "topic_bert_parquet",
+        15,
+        50,
+        10
     )
     bertTop.train_topicbert()
     topicEvolution = TopicEvolution("topic_bert_parquet", bertTop.get_dataframe_paper(), "Topic_Over_Time")
     topicEvolution.topic_drift()
-    #topicEvolution.topic_evolution_graphic()
-    #topicEvolution.top_trend_graphic()
-    #topicEvolution.jaccard_stability_graphic()
+    topicEvolution.topic_evolution_graphic()
+    topicEvolution.top_trend_graphic()
+    topicEvolution.jaccard_stability_graphic()
     topicEvolution.generate_atlas_bump_chart(top_n_words=21, num_periods=6, path_dir_bump_chart = "BumpChart")
