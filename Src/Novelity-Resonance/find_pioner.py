@@ -41,25 +41,27 @@ class PioneerAnalyzer:
             year_indices[y] = (past_idx, future_idx)
 
         results = {}
-        for id_paper in range(len(self.df_merged)):
-            year_paper = self.df_merged["publication_year"][id_paper]
+        for id_paper_row in range(len(self.df_merged)):
+            year_paper = self.df_merged["publication_year"].iloc[id_paper_row]
+            ids = self.df_merged.iloc[id_paper_row]["id"]
             if year_paper not in valid_years:
-                results[id_paper] = {"Novelty": np.nan, "Transience": np.nan, "Resonance": np.nan}
+                results[ids] = {"Novelty": np.nan, "Transience": np.nan, "Resonance": np.nan}
                 continue
 
             past_mask_index, future_mask_index = year_indices[year_paper]
-            novelty = self._calculate_similarity_masked(id_paper, past_mask_index, k_mean)
-            transience = self._calculate_similarity_masked(id_paper, future_mask_index, k_mean)
+            novelty = self._calculate_similarity_masked(id_paper_row, past_mask_index, k_mean)
+            transience = self._calculate_similarity_masked(id_paper_row, future_mask_index, k_mean)
             resonance = novelty - transience # Sim_Future - Sim_Past
-            results[id_paper] = {"Novelty": float(novelty), "Transience": float(transience), "Resonance": float(resonance)}
+            results[ids] = {"Novelty": float(novelty), "Transience": float(transience), "Resonance": float(resonance)}
 
         df_results = pd.DataFrame.from_dict(results, orient="index")
         df_results.reset_index(inplace=True)
-        df_results.rename(columns={'index': 'id'}, inplace=True)
+        df_results.rename(columns={"index": "id"}, inplace=True)
         print("before: ", len(df_results))
         df_results = df_results.dropna()
         print("after: ",len(df_results))
         df_results.to_csv(self.metric_ris_path, index=False)
+        return df_results
 
     def _calculate_similarity_masked(self, id_paper: int, mask_index: np.array, k_mean):
         if len(mask_index) > 0:
@@ -75,4 +77,6 @@ if __name__ == "__main__":
         data_path="../Data/Raw/scraped_data_cleaned.parquet",
         metric_ris_path = "metric.csv"
     )
-    analysis.calculate_metrics(k_mean=30, year_window=3)
+    ris_df = analysis.calculate_metrics(k_mean=30, year_window=3)
+    print("metrics_df: ", ris_df)
+    #analysis.plot_results()
