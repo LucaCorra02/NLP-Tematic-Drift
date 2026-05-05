@@ -24,6 +24,7 @@ class PioneerAnalyzer:
         self.df_merged = self.df_merged.sort_values(by=["publication_year"]).reset_index(drop=True)
         self.embeddings = np.vstack(self.df_merged["embedding"].values)
         self.similarity_matrix = cosine_similarity(self.embeddings)
+        self.plot_df = None
 
     """
         I use KNN (K-Nearest-Neighbourhood instead of centroid for every years)
@@ -64,6 +65,10 @@ class PioneerAnalyzer:
         print("before: ", len(df_results))
         df_results = df_results.dropna()
         print("after: ",len(df_results))
+
+        df_results['Novelty_Z'] = (df_results['Novelty'] - df_results['Novelty'].mean()) / df_results['Novelty'].std()
+        df_results['Transience_Z'] = (df_results['Transience'] - df_results['Transience'].mean()) / df_results['Transience'].std()
+        df_results['Resonance_Z'] = df_results['Novelty_Z'] - df_results['Transience_Z']
         df_results.to_csv(self.metric_ris_path, index=False)
         return df_results
 
@@ -78,18 +83,19 @@ class PioneerAnalyzer:
     def plot_results(self):
         df_result = pd.read_csv(self.metric_ris_path)
         df_plot = pd.merge(df_result, self.df_merged, on="id", how="inner")
+        self.plot_df = df_plot
         fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
-        sns.scatterplot(data=df_plot, x='Novelty', y='Transience',
+        sns.scatterplot(data=df_plot, x='Novelty_Z', y='Transience_Z',
                         hue='publication_year', palette='viridis', alpha=0.6, ax=axes[0])
-        axes[0].plot([df_plot['Novelty'].min(), df_plot['Novelty'].max()],
-                     [df_plot['Novelty'].min(), df_plot['Novelty'].max()],
+        axes[0].plot([df_plot['Novelty_Z'].min(), df_plot['Novelty_Z'].max()],
+                     [df_plot['Novelty_Z'].min(), df_plot['Novelty_Z'].max()],
                      'r--', label='X=Y (Trade-off)')
         axes[0].set_title('Novelty vs Transience')
         axes[0].legend()
 
-        yearly_res = df_plot.groupby('publication_year')['Resonance'].mean().reset_index()
-        sns.lineplot(data=yearly_res, x='publication_year', y='Resonance', marker='o',
+        yearly_res = df_plot.groupby('publication_year')['Resonance_Z'].mean().reset_index()
+        sns.lineplot(data=yearly_res, x='publication_year', y='Resonance_Z', marker='o',
                      color='b', linewidth=2, ax=axes[1])
         axes[1].set_title('Average Resonance over Time')
         axes[1].set_xlabel('Year')
@@ -97,6 +103,12 @@ class PioneerAnalyzer:
         axes[1].grid(True, linestyle='--', alpha=0.7)
         plt.tight_layout()
         plt.savefig(self.graphics_path / "Scatter.jpeg")
+
+    def plot_distribution(self):
+        fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
+        axs[0].hist(self.plot_df["Novelty_Z"], bins=100)
+        axs[1].hist(self.plot_df["Transience_Z"], bins=100)
+        plt.show()
 
 """
     TODO: Graficare distribuzioni
@@ -113,3 +125,4 @@ if __name__ == "__main__":
     ris_df = analysis.calculate_metrics(k_mean=10, year_window=3)
     print("metrics_df: ", ris_df)
     analysis.plot_results()
+    analysis.plot_distribution()
