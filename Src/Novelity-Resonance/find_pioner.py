@@ -1,14 +1,18 @@
 from pathlib import Path
-from unittest import result
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
 
 class PioneerAnalyzer:
-    def __init__(self, similarity_path, data_path, metric_ris_path):
+    def __init__(self, similarity_path, data_path, metric_ris_path, graphics_path):
         self.similarity_path = Path(similarity_path)
         self.data_path = Path(data_path)
         self.metric_ris_path = Path(metric_ris_path)
+        os.makedirs(graphics_path, exist_ok=True)
+        self.graphics_path = Path(graphics_path)
         tmp_df_sim = pd.read_parquet(self.similarity_path)
         tmp_df_data =  pd.read_parquet(self.data_path)
         self.df_merged = pd.merge(
@@ -71,12 +75,41 @@ class PioneerAnalyzer:
             return 1.0 - top_k_similarity
         return np.nan
 
+    def plot_results(self):
+        df_result = pd.read_csv(self.metric_ris_path)
+        df_plot = pd.merge(df_result, self.df_merged, on="id", how="inner")
+        fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+
+        sns.scatterplot(data=df_plot, x='Novelty', y='Transience',
+                        hue='publication_year', palette='viridis', alpha=0.6, ax=axes[0])
+        axes[0].plot([df_plot['Novelty'].min(), df_plot['Novelty'].max()],
+                     [df_plot['Novelty'].min(), df_plot['Novelty'].max()],
+                     'r--', label='X=Y (Trade-off)')
+        axes[0].set_title('Novelty vs Transience')
+        axes[0].legend()
+
+        yearly_res = df_plot.groupby('publication_year')['Resonance'].mean().reset_index()
+        sns.lineplot(data=yearly_res, x='publication_year', y='Resonance', marker='o',
+                     color='b', linewidth=2, ax=axes[1])
+        axes[1].set_title('Average Resonance over Time')
+        axes[1].set_xlabel('Year')
+        axes[1].set_ylabel('Mean Resonance')
+        axes[1].grid(True, linestyle='--', alpha=0.7)
+        plt.tight_layout()
+        plt.savefig(self.graphics_path / "Scatter.jpeg")
+
+"""
+    TODO: Graficare distribuzioni
+    TODO: Prendere i top 10 paper e vedere di cosa parlano
+    TODO: incrociare i dati con etichette bert topic
+"""
 if __name__ == "__main__":
     analysis = PioneerAnalyzer(
         similarity_path="../Embeddings/Similarity/similarity.parquet",
         data_path="../Data/Raw/scraped_data_cleaned.parquet",
-        metric_ris_path = "metric.csv"
+        metric_ris_path = "metric.csv",
+        graphics_path="Plots"
     )
-    ris_df = analysis.calculate_metrics(k_mean=30, year_window=3)
+    ris_df = analysis.calculate_metrics(k_mean=10, year_window=3)
     print("metrics_df: ", ris_df)
-    #analysis.plot_results()
+    analysis.plot_results()
