@@ -169,22 +169,36 @@ class PioneerAnalyzer:
         topic_info = model.get_topic_info()
         df_labeled = pd.merge(
             df_labeled,
-            topic_info[['Topic', 'Name']],
-            left_on='Topic_ID',
-            right_on='Topic',
-            how='left'
+            topic_info[["Topic", "Name"]],
+            left_on="Topic_ID",
+            right_on="Topic",
+            how="left"
         )
         return df_labeled
 
     def analyze_bert_topic_laber(self, topic_bert__path, pioneer_csv_path = "top_pioneer.csv"):
         df_labeled = self.link_pioneer_and_topic_label(topic_bert__path, pioneer_csv_path)
-        print(df_labeled, len(df_labeled))
+        df_labeled = df_labeled[df_labeled["Topic_ID"] != -1]
+        topic_counts = df_labeled['Name'].value_counts()
 
+        fig, ax = plt.subplots(figsize=(12, 8))
+        colors = plt.cm.Set3(range(len(topic_counts)))
+        wedges, texts, autotexts = ax.pie(
+            topic_counts.values,
+            labels=topic_counts.index,
+            autopct='%1.1f%%',
+            startangle=90,
+            colors=colors,
+            textprops={'fontsize': 10}
+        )
+        for autotext in autotexts:
+            autotext.set_color('black')
+            autotext.set_fontweight('bold')
+            autotext.set_fontsize(9)
+        ax.set_title('Distribution of Top Pioneers by Topic', fontsize=14, fontweight='bold')
+        plt.tight_layout()
+        plt.savefig(self.graphics_path / "pioneers_pie_chart.jpeg", dpi=300, bbox_inches='tight')
 
-"""
-    TODO: Prendere i top 10 paper e vedere di cosa parlano
-    TODO: incrociare i dati con etichette bert topic
-"""
 if __name__ == "__main__":
     analysis = PioneerAnalyzer(
         similarity_path="../Embeddings/Similarity/similarity.parquet",
@@ -196,7 +210,7 @@ if __name__ == "__main__":
     print("metrics_df: ", ris_df)
     analysis.plot_results()
     analysis.plot_distribution()
-    ris = analysis.print_top_pioneer("top_pioneer.csv")
+    ris = analysis.print_top_pioneer("top_pioneer.csv", 20)
     print(ris)
-    analysis.analyze_pioneer_drivers()
+    analysis.analyze_pioneer_drivers("top_pioneer.csv", 20)
     analysis.analyze_bert_topic_laber("../Embeddings/BertTopic/topic_bert_parquet", "top_pioneer.csv")
