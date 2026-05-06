@@ -160,6 +160,8 @@ class PioneerAnalyzer:
         top_pioneer_df = pd.read_csv(pioneer_csv_path)
         originally_df = pd.read_parquet(self.data_path)
         originally_df["Topic_ID"] = model.topics_  # df_originally should be in the same order as the one use for bert topic train
+        df_original = originally_df.copy()
+
         df_labeled = pd.merge(
             top_pioneer_df,
             originally_df[['id', 'Topic_ID']],
@@ -174,11 +176,13 @@ class PioneerAnalyzer:
             right_on="Topic",
             how="left"
         )
-        return df_labeled
+        return df_labeled, df_original
 
     def analyze_bert_topic_laber(self, topic_bert__path, pioneer_csv_path = "top_pioneer.csv"):
-        df_labeled = self.link_pioneer_and_topic_label(topic_bert__path, pioneer_csv_path)
+        df_labeled, _ = self.link_pioneer_and_topic_label(topic_bert__path, pioneer_csv_path)
+
         df_labeled = df_labeled[df_labeled["Topic_ID"] != -1]
+        df_labeled[["id", "Topic", "Name", "title"]].to_csv("pioneer_with_label.csv")
         topic_counts = df_labeled['Name'].value_counts()
 
         fig, ax = plt.subplots(figsize=(12, 8))
@@ -198,6 +202,29 @@ class PioneerAnalyzer:
         ax.set_title('Distribution of Top Pioneers by Topic', fontsize=14, fontweight='bold')
         plt.tight_layout()
         plt.savefig(self.graphics_path / "pioneers_pie_chart.jpeg", dpi=300, bbox_inches='tight')
+        return topic_counts
+
+    def dynamic_topic_evolution(self, topic_bert__path, pioneer_csv_path, topics_count):
+        df_pioner, df_original = self.link_pioneer_and_topic_label(topic_bert__path, pioneer_csv_path)
+        model = BERTopic.load(topic_bert__path)
+        abstracts = df_original["abstract"].values
+        years = df_original["publication_year"].values
+        assert len(abstracts) == len(years)
+
+        top_frequency = topics_count.head(5).keys()
+        name_list = [name for name in top_frequency]
+        print(name_list)
+        ids = df_pioner[df_pioner["Name"].isin(name_list)]["Topic"]
+        topics_over_time = model.topics_over_time(
+            abstracts,
+            years
+        )
+        fig = model.visualize_topics_over_time(
+            topics_over_time,
+            topics= ids,
+            height=600
+        )
+        fig.write_html(self.graphics_path / "topics_over_time_dynamic.html")
 
 if __name__ == "__main__":
     analysis = PioneerAnalyzer(
@@ -212,5 +239,6 @@ if __name__ == "__main__":
     analysis.plot_distribution()
     ris = analysis.print_top_pioneer("top_pioneer.csv", 20)
     print(ris)
-    analysis.analyze_pioneer_drivers("top_pioneer.csv", 20)
-    analysis.analyze_bert_topic_laber("../Embeddings/BertTopic/topic_bert_parquet", "top_pioneer.csv")
+    #analysis.analyze_pioneer_drivers("top_pioneer.csv", 20)
+    topic_counts = analysis.analyze_bert_topic_laber("../Embeddings/BertTopic/topic_bert_parquet", "top_pioneer.csv")
+    analysis.dynamic_topic_evolution("../Embeddings/BertTopic/topic_bert_parquet", "top_pioneer.csv", topic_counts)
