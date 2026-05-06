@@ -5,6 +5,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+from sklearn.feature_extraction.text import TfidfVectorizer
+import re
 
 class PioneerAnalyzer:
     def __init__(self, similarity_path, data_path, metric_ris_path, graphics_path):
@@ -108,10 +110,50 @@ class PioneerAnalyzer:
         fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
         axs[0].hist(self.plot_df["Novelty_Z"], bins=100)
         axs[1].hist(self.plot_df["Transience_Z"], bins=100)
-        plt.show()
+        axs[0].set_title("Novelty (Normalized)")
+        axs[1].set_title("Transience (Normalized)")
+        plt.savefig(self.graphics_path / "Distribution.jpeg")
+
+    def print_top_pioneer(self, top_csv_path, top_k = 50):
+        df = self.plot_df.copy()
+        df.sort_values(by="Resonance_Z", ascending=False, inplace=True)
+        records = []
+        cont = 0
+        for index, row in df.iterrows():
+            record = {
+                "Id": row["id"],
+                "year": row["publication_year"],
+                "resonance": row["Resonance_Z"],
+                "title": row["title"],
+                "abstract": row["abstract"]
+            }
+            records.append(record)
+            #print(f"Id:{row["id"]}, title:{row["title"]}, abstract:{row["abstract"]}, year:{row["publication_year"]}, resonance:{row["Resonance_Z"]}")
+            if cont == top_k: break
+            cont+=1
+        ris = pd.DataFrame(records)
+        ris.to_csv(top_csv_path)
+        return ris
+
+    def analyze_pioneer_drivers(self, csv_path="top_pioneer.csv", top_n_papers=50):
+        df = pd.read_csv(csv_path)
+        top_pioneers = df.sort_values(by='resonance', ascending=False).head(top_n_papers)
+
+        def clean_text(text):
+            text = str(text).lower()
+            text = re.sub(r'[^a-z\s]', ' ', text)
+            return text
+
+        abstracts = top_pioneers['abstract'].apply(clean_text).tolist()
+        vectorizer = TfidfVectorizer(max_df=0.8, min_df=2, stop_words='english')
+        tfidf_matrix = vectorizer.fit_transform(abstracts)
+        feature_names = vectorizer.get_feature_names_out()
+        avg_tfidf = tfidf_matrix.mean(axis=0).A1
+        words_df = pd.DataFrame({'word': feature_names, 'weight': avg_tfidf})
+        words_df = words_df.sort_values(by='weight', ascending=False).head(20)
+        print(words_df.to_string(index=False))
 
 """
-    TODO: Graficare distribuzioni
     TODO: Prendere i top 10 paper e vedere di cosa parlano
     TODO: incrociare i dati con etichette bert topic
 """
@@ -126,3 +168,6 @@ if __name__ == "__main__":
     print("metrics_df: ", ris_df)
     analysis.plot_results()
     analysis.plot_distribution()
+    ris = analysis.print_top_pioneer("top_pioneer.csv")
+    print(ris)
+    analysis.analyze_pioneer_drivers()
