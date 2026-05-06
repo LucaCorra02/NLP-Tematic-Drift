@@ -7,6 +7,7 @@ import seaborn as sns
 import os
 from sklearn.feature_extraction.text import TfidfVectorizer
 import re
+from bertopic import BERTopic
 
 class PioneerAnalyzer:
     def __init__(self, similarity_path, data_path, metric_ris_path, graphics_path):
@@ -121,7 +122,7 @@ class PioneerAnalyzer:
         cont = 0
         for index, row in df.iterrows():
             record = {
-                "Id": row["id"],
+                "id": row["id"],
                 "year": row["publication_year"],
                 "resonance": row["Resonance_Z"],
                 "title": row["title"],
@@ -153,6 +154,33 @@ class PioneerAnalyzer:
         words_df = words_df.sort_values(by='weight', ascending=False).head(20)
         print(words_df.to_string(index=False))
 
+
+    def link_pioneer_and_topic_label(self, topic_bert__path, pioneer_csv_path = "top_pioneer.csv"):
+        model = BERTopic.load(topic_bert__path)
+        top_pioneer_df = pd.read_csv(pioneer_csv_path)
+        originally_df = pd.read_parquet(self.data_path)
+        originally_df["Topic_ID"] = model.topics_  # df_originally should be in the same order as the one use for bert topic train
+        df_labeled = pd.merge(
+            top_pioneer_df,
+            originally_df[['id', 'Topic_ID']],
+            on="id",
+            how="inner"
+        )
+        topic_info = model.get_topic_info()
+        df_labeled = pd.merge(
+            df_labeled,
+            topic_info[['Topic', 'Name']],
+            left_on='Topic_ID',
+            right_on='Topic',
+            how='left'
+        )
+        return df_labeled
+
+    def analyze_bert_topic_laber(self, topic_bert__path, pioneer_csv_path = "top_pioneer.csv"):
+        df_labeled = self.link_pioneer_and_topic_label(topic_bert__path, pioneer_csv_path)
+        print(df_labeled, len(df_labeled))
+
+
 """
     TODO: Prendere i top 10 paper e vedere di cosa parlano
     TODO: incrociare i dati con etichette bert topic
@@ -171,3 +199,4 @@ if __name__ == "__main__":
     ris = analysis.print_top_pioneer("top_pioneer.csv")
     print(ris)
     analysis.analyze_pioneer_drivers()
+    analysis.analyze_bert_topic_laber("../Embeddings/BertTopic/topic_bert_parquet", "top_pioneer.csv")
