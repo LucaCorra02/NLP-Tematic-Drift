@@ -225,6 +225,10 @@ class PioneerAnalyzer:
             height=600
         )
         fig.write_html(self.graphics_path / "topics_over_time_dynamic.html")
+"""
+TODO: ADD TRAENCECY AND NOVELITY
+TODO: ADD LOWEST SCORE RESONANCE
+"""
 
 if __name__ == "__main__":
     analysis = PioneerAnalyzer(
