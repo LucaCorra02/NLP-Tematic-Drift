@@ -1,5 +1,4 @@
 import math
-
 import pandas as pd
 import os
 import numpy as np
@@ -7,6 +6,8 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from sklearn.metrics.pairwise import cosine_similarity
 import umap
+from scipy.stats import theilslopes
+import pymannkendall as mk
 
 class Similtarity:
     def __init__(self, abstract_embedding_path, scope_embedding_path, output_dir):
@@ -56,6 +57,24 @@ class PlotSimilarity:
         assert self.df_merged.isna().sum().sum() == 0, "nan values"
         self.df_scope = pd.read_parquet(scope_embedding_path, engine='pyarrow')
 
+    def compute_unified_score(self):
+        score_cols = self.df_merged.filter(like="score_").columns
+        self.df_merged["alignment_score"] = self.df_merged[score_cols].max(axis=1)
+        self.df_merged["best_scope"] = self.df_merged[score_cols].idxmax(axis=1)
+        return self.df_merged
+
+    def test_aligniment_trend(self):
+        if "alignment_score" not in self.df_merged.columns:
+            self.compute_unified_score()
+        mean_per_year = self.df_merged.groupby("publication_year")["alignment_score"].mean()
+        mk_result = mk.original_test(mean_per_year.values)
+        slope, intercept, lo, hi = theilslopes(
+            mean_per_year.values, np.arange(len(mean_per_year)), 0.95
+        )
+        print(f"Mann-Kendall trend: {mk_result.trend}, p={mk_result.p:.6f}, tau={mk_result.Tau:.4f}")
+        print(f"Theil-Sen slope: {slope:.6f} per year (CI: [{lo:.6f}, {hi:.6f}])")
+        return {"trend": mk_result.trend, "p_value": mk_result.p, "tau": mk_result.Tau, "slope": slope}
+
     def plot_similarity_distribution(self):
         df = self.df_score
         scores_col = df.loc[:,'score_scope-1':]
@@ -64,7 +83,7 @@ class PlotSimilarity:
         plt.hist(data, bins=40, color='skyblue', edgecolor='black')
         plt.xlabel("Values")
         plt.ylabel("Frequency")
-        plt.title("Score Distribution")
+        plt.title("Score Distribution (Mean)")
         plt.savefig(self.output_dir + "/distribution.png")
 
     def plot_year_similarity(self):
@@ -383,3 +402,7 @@ if __name__ == "__main__":
     plotsim.compute_k_mean_cosine(200)
     years_embeddings, intra_sim, mmd_matrix = plotsim.heat_map_mmd()
     #plotsim.mmd_permutation_test(years_embeddings, mmd_matrix, 1000)
+    sos = plotsim.compute_unified_score()
+    print(sos)
+    ris = plotsim.test_aligniment_trend()
+    print(ris)
