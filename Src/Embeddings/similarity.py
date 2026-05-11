@@ -76,37 +76,43 @@ class PlotSimilarity:
         return {"trend": mk_result.trend, "p_value": mk_result.p, "tau": mk_result.Tau, "slope": slope}
 
     def plot_similarity_distribution(self):
-        df = self.df_score
-        scores_col = df.loc[:,'score_scope-1':]
-        df["mean_scores"] = scores_col.mean(axis=1)
-        data = df["mean_scores"]
+        if "alignment_score" not in self.df_merged.columns:
+            self.compute_unified_score()
+        df = self.df_merged
+        data = df["alignment_score"]
+
+        plt.axvline(data.mean(), color='red', linestyle='dashed', linewidth=2, label=f'Mean: {data.mean():.2f}')
+        plt.axvline(data.median(), color='green', linestyle='dotted', linewidth=2, label=f'Median: {data.median():.2f}')
         plt.hist(data, bins=40, color='skyblue', edgecolor='black')
         plt.xlabel("Values")
         plt.ylabel("Frequency")
-        plt.title("Score Distribution (Mean)")
+        plt.title("Score Distribution (Max)")
+        plt.legend()
         plt.savefig(self.output_dir + "/distribution.png")
 
     def plot_year_similarity(self):
+        if "alignment_score" not in self.df_merged.columns:
+            self.compute_unified_score()
         df = self.df_merged
-        df["mean_scores"] = df.filter(like="score_").mean(axis=1)
-        mean_per_year = df.groupby("publication_year")["mean_scores"].mean()
+        mean_per_year = df.groupby("publication_year")["alignment_score"].mean()
         years = [year for year in mean_per_year.keys()]
         mean = [mean_per_year[year] for year in mean_per_year.keys()]
 
         fig, ax = plt.subplots(figsize=(10, 6))
         ax.plot(years, mean, marker='o', linestyle='-')
-        ax.set(xlabel='Year', ylabel='Mean Score',
+        ax.set(xlabel='Year', ylabel='Mean score per year',
                title='Similarity trend')
         ax.grid()
         ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
         ax.set_xticks(years)
         ax.tick_params(axis='x', rotation=45)
-        fig.savefig(self.output_dir + "/trend.png")
+        fig.savefig(self.output_dir + "/trend_mean.png")
 
     def plot_year_similarity_box(self):
+        if "alignment_score" not in self.df_merged.columns:
+            self.compute_unified_score()
         df = self.df_merged
-
-        df["max_scores"] = df.filter(like="score_").max(axis=1)
+        df["max_scores"] = df["alignment_score"]
         years = sorted(df["publication_year"].astype(int).unique())
         data_to_plot = [
             df[df["publication_year"] == y]["max_scores"]
@@ -381,9 +387,6 @@ class PlotSimilarity:
 
         return (mmd_count + 1) / (n_permutation + 1)
 
-
-
-
 if __name__ == "__main__":
     similarity = Similtarity("Emb/normalize_embedding.parquet", "Emb/scope_embeddings.parquet", "Similarity")
     similarity.calculate_cosine_similarity("similarity.parquet")
@@ -392,6 +395,7 @@ if __name__ == "__main__":
         "Similarity/similarity.parquet", "../Data/Raw/scraped_data_cleaned.parquet",
         "Emb/scope_embeddings.parquet", "Similarity"
     )
+    unify_scores = plotsim.compute_unified_score()
     plotsim.plot_similarity_distribution()
     plotsim.plot_year_similarity()
     plotsim.plot_year_similarity_box()
@@ -401,8 +405,8 @@ if __name__ == "__main__":
     plotsim.plot_umap_2d()
     plotsim.compute_k_mean_cosine(200)
     years_embeddings, intra_sim, mmd_matrix = plotsim.heat_map_mmd()
-    #plotsim.mmd_permutation_test(years_embeddings, mmd_matrix, 1000)
-    sos = plotsim.compute_unified_score()
-    print(sos)
+    plotsim.mmd_permutation_test(years_embeddings, mmd_matrix, 1000)
+
+    print(unify_scores)
     ris = plotsim.test_aligniment_trend()
     print(ris)
