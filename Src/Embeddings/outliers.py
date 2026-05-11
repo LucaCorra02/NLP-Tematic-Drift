@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from similarity import PlotSimilarity
 
-
+ # TODO: add BertTopic -1 check
 class AnalyzeOutliers:
     """
         Require to execute similarity.py first
@@ -19,6 +19,19 @@ class AnalyzeOutliers:
         )
         self.df_score = plotsim.compute_unified_score() # df with alignement score
 
+    def find_outliers(self):
+        df = pd.merge(
+            self.df_score[["id", "alignment_score", "best_scope", "publication_year"]],
+            self.df_abstract[["id", "title", "abstract"]],
+            on="id", how="inner"
+        )
+        Q1 = df["alignment_score"].quantile(0.25)
+        Q3 = df["alignment_score"].quantile(0.75)
+        IQR = Q3 - Q1
+        threshold = Q1 - 1.5 * IQR
+        outliers = df[df["alignment_score"] < threshold]
+        outliers.to_csv(os.path.join(self.output_dir, "outliers_bottom.csv"), index=False)
+
 
 if __name__ == "__main__":
     analyzer = AnalyzeOutliers(
@@ -27,5 +40,5 @@ if __name__ == "__main__":
         "Emb/scope_embeddings.parquet",
         "Outliers"
     )
-    print(analyzer.df_score)
+    analyzer.find_outliers()
 
