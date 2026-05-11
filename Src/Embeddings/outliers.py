@@ -5,8 +5,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ast
 from collections import Counter
+from bertopic import BERTopic
+from scipy.stats import ttest_ind
 
- # TODO: add BertTopic -1 check
+ # TODO: add pioneer score check
 class AnalyzeOutliers:
     """
         Require to execute similarity.py first
@@ -35,6 +37,7 @@ class AnalyzeOutliers:
         threshold = Q1 - 1.5 * IQR
         outliers = df[df["alignment_score"] < threshold]
         outliers.to_csv(os.path.join(self.output_dir, "outliers_bottom.csv"), index=False)
+        return outliers
 
 
     def analyze_outlier_concepts(self, outliers_csv_path="outliers_bottom.csv"):
@@ -81,6 +84,53 @@ class AnalyzeOutliers:
         print("over-representation concept:" ,df_compare[df_compare["overrepresentation"] > 0].head(20).to_string(index=False))
         return df_compare
 
+    def cross_validate_with_topics(self, topic_model_path):
+        model = BERTopic.load(topic_model_path)
+        df_original = self.df_abstract.copy()
+        abstracts = df_original["abstract"].tolist()
+        doc_info = model.get_document_info(abstracts)
+        df_original = df_original.reset_index(drop=True)
+        df_original["Topic_ID"] = doc_info["Topic"].values
+        df = pd.merge(
+            self.df_score[["id", "alignment_score"]],
+            df_original[["id", "Topic_ID"]],
+            on="id", how="inner"
+        )
+        df["is_topic_minus1"] = df["Topic_ID"] == -1
+        n_minus1 = df["is_topic_minus1"].sum()
+        mean_others = df[~df["is_topic_minus1"]]["alignment_score"].mean()
+        mean_minus1 = df[df["is_topic_minus1"]]["alignment_score"].mean()
+        t_stat, p_val = ttest_ind(
+            df[~df["is_topic_minus1"]]["alignment_score"],
+            df[df["is_topic_minus1"]]["alignment_score"],
+            equal_var=False
+        )
+
+        print("Alignment score topic -1")
+        print(f"Papers in Topic -1  : {n_minus1} ({n_minus1 / len(df) * 100:.1f}%)")
+        print(f"Mean alignment (Topic -1) : {mean_minus1:.4f}")
+        print(f"Mean alignment (others)   : {mean_others:.4f}")
+        print(f"Differenza               : {mean_others - mean_minus1:.4f}")
+        print(f"Welch t-test: t={t_stat:.3f}, p={p_val:.6f}")
+
+        outlier_ids = set(self.find_outliers()["id"])
+        topic_minus1_ids = set(df[df["is_topic_minus1"]]["id"])
+        overlap = outlier_ids & topic_minus1_ids
+
+        print("outlier (alignment) intersect topic -1:")
+        print(f"  Outlier tot          : {len(outlier_ids)}")
+        print(f"  Topic -1 tot         : {len(topic_minus1_ids)}")
+        print(f"  Overlap                 : {len(overlap)} "
+              f"({len(overlap) / max(len(outlier_ids), 1) * 100:.1f}% of the outlier)")
+        return {
+            "n_topic_minus1": n_minus1,
+            "mean_topic_minus1": mean_minus1,
+            "mean_others": mean_others,
+            "p_value": p_val,
+            "overlap_count": len(overlap),
+            "overlap_pct": len(overlap) / max(len(outlier_ids), 1) * 100
+        }
+
 
 if __name__ == "__main__":
     analyzer = AnalyzeOutliers(
@@ -91,4 +141,5 @@ if __name__ == "__main__":
     )
     analyzer.find_outliers()
     analyzer.analyze_outlier_concepts()
+    analyzer.cross_validate_with_topics("BertTopic/topic_bert_parquet")
 
