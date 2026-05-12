@@ -115,11 +115,12 @@ class PioneerAnalyzer:
         axs[1].set_title("Transience (Normalized)")
         plt.savefig(self.graphics_path / "Distribution.jpeg")
 
-    def print_top_pioneer(self, top_csv_path, top_k = 50):
+    def print_top_pioneer(self, top_csv_path, threshold = 1.5):
         df = self.plot_df.copy()
         df.sort_values(by="Resonance_Z", ascending=False, inplace=True)
+        df = df[df["Resonance_Z"] > threshold]
+        num_pioneers = len(df)
         records = []
-        cont = 0
         for index, row in df.iterrows():
             record = {
                 "id": row["id"],
@@ -130,11 +131,9 @@ class PioneerAnalyzer:
             }
             records.append(record)
             #print(f"Id:{row["id"]}, title:{row["title"]}, abstract:{row["abstract"]}, year:{row["publication_year"]}, resonance:{row["Resonance_Z"]}")
-            if cont == top_k: break
-            cont+=1
         ris = pd.DataFrame(records)
         ris.to_csv(top_csv_path)
-        return ris
+        return ris, num_pioneers
 
     def analyze_pioneer_drivers(self, csv_path="top_pioneer.csv", top_n_papers=50):
         df = pd.read_csv(csv_path)
@@ -159,6 +158,7 @@ class PioneerAnalyzer:
         model = BERTopic.load(topic_bert__path)
         top_pioneer_df = pd.read_csv(pioneer_csv_path)
         originally_df = pd.read_parquet(self.data_path)
+        assert len(model.topics_) == len(originally_df)
         originally_df["Topic_ID"] = model.topics_  # df_originally should be in the same order as the one use for bert topic train
         df_original = originally_df.copy()
 
@@ -178,11 +178,14 @@ class PioneerAnalyzer:
         )
         return df_labeled, df_original
 
-    def analyze_bert_topic_laber(self, topic_bert__path, pioneer_csv_path = "top_pioneer.csv"):
+    """
+        limits parameters help with the readability of the pie chart
+    """
+    def analyze_bert_topic_label(self, topic_bert__path, pioneer_csv_path ="top_pioneer.csv", limits = 20):
         df_labeled, _ = self.link_pioneer_and_topic_label(topic_bert__path, pioneer_csv_path)
-
         df_labeled = df_labeled[df_labeled["Topic_ID"] != -1]
         df_labeled[["id", "Topic", "Name", "title"]].to_csv("pioneer_with_label.csv")
+        df_labeled = df_labeled.head(limits)
         topic_counts = df_labeled['Name'].value_counts()
 
         fig, ax = plt.subplots(figsize=(12, 8))
@@ -199,7 +202,7 @@ class PioneerAnalyzer:
             autotext.set_color('black')
             autotext.set_fontweight('bold')
             autotext.set_fontsize(9)
-        ax.set_title('Distribution of Top Pioneers by Topic', fontsize=14, fontweight='bold')
+        ax.set_title(f"Distribution of top {limits} pioneers by topic", fontsize=14, fontweight='bold')
         plt.tight_layout()
         plt.savefig(self.graphics_path / "pioneers_pie_chart.jpeg", dpi=300, bbox_inches='tight')
         return topic_counts
@@ -225,6 +228,7 @@ class PioneerAnalyzer:
             height=600
         )
         fig.write_html(self.graphics_path / "topics_over_time_dynamic.html")
+        fig.write_image(self.graphics_path / "topics_over_time_dynamic.png")
 """
 TODO: ADD TRAENCECY AND NOVELITY
 TODO: ADD LOWEST SCORE RESONANCE
@@ -241,8 +245,8 @@ if __name__ == "__main__":
     print("metrics_df: ", ris_df)
     analysis.plot_results()
     analysis.plot_distribution()
-    ris = analysis.print_top_pioneer("top_pioneer.csv", 20)
+    ris, num_pioneers = analysis.print_top_pioneer("top_pioneer.csv", 1.5)
     print(ris)
-    #analysis.analyze_pioneer_drivers("top_pioneer.csv", 20)
-    topic_counts = analysis.analyze_bert_topic_laber("../Embeddings/BertTopic/topic_bert_parquet", "top_pioneer.csv")
+    #analysis.analyze_pioneer_drivers("top_pioneer.csv", num_pioneers)
+    topic_counts = analysis.analyze_bert_topic_label("../Embeddings/BertTopic/topic_bert_parquet", "top_pioneer.csv")
     analysis.dynamic_topic_evolution("../Embeddings/BertTopic/topic_bert_parquet", "top_pioneer.csv", topic_counts)
