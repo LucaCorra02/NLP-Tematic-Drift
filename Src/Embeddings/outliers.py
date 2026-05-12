@@ -6,9 +6,8 @@ import matplotlib.pyplot as plt
 import ast
 from collections import Counter
 from bertopic import BERTopic
-from scipy.stats import ttest_ind
+from scipy.stats import pearsonr, ttest_ind
 
- # TODO: add pioneer score check
 class AnalyzeOutliers:
     """
         Require to execute similarity.py first
@@ -87,6 +86,7 @@ class AnalyzeOutliers:
     def cross_validate_with_topics(self, topic_model_path):
         model = BERTopic.load(topic_model_path)
         df_original = self.df_abstract.copy()
+        assert len(model.topics_) == len(df_original)
         abstracts = df_original["abstract"].tolist()
         doc_info = model.get_document_info(abstracts)
         df_original = df_original.reset_index(drop=True)
@@ -107,10 +107,10 @@ class AnalyzeOutliers:
         )
 
         print("Alignment score topic -1")
-        print(f"Papers in Topic -1  : {n_minus1} ({n_minus1 / len(df) * 100:.1f}%)")
-        print(f"Mean alignment (Topic -1) : {mean_minus1:.4f}")
-        print(f"Mean alignment (others)   : {mean_others:.4f}")
-        print(f"Differenza               : {mean_others - mean_minus1:.4f}")
+        print(f"Papers in Topic -1: {n_minus1} ({n_minus1 / len(df) * 100:.1f}%)")
+        print(f"Mean alignment (Topic -1): {mean_minus1:.4f}")
+        print(f"Mean alignment (others): {mean_others:.4f}")
+        print(f"Delta: {mean_others - mean_minus1:.4f}")
         print(f"Welch t-test: t={t_stat:.3f}, p={p_val:.6f}")
 
         outlier_ids = set(self.find_outliers()["id"])
@@ -118,9 +118,9 @@ class AnalyzeOutliers:
         overlap = outlier_ids & topic_minus1_ids
 
         print("outlier (alignment) intersect topic -1:")
-        print(f"  Outlier tot          : {len(outlier_ids)}")
-        print(f"  Topic -1 tot         : {len(topic_minus1_ids)}")
-        print(f"  Overlap                 : {len(overlap)} "
+        print(f"Outlier tot: {len(outlier_ids)}")
+        print(f"Topic -1 tot: {len(topic_minus1_ids)}")
+        print(f"Overlap: {len(overlap)} "
               f"({len(overlap) / max(len(outlier_ids), 1) * 100:.1f}% of the outlier)")
         return {
             "n_topic_minus1": n_minus1,
@@ -130,6 +130,53 @@ class AnalyzeOutliers:
             "overlap_count": len(overlap),
             "overlap_pct": len(overlap) / max(len(outlier_ids), 1) * 100
         }
+
+    """
+        Needs to execute find_pioner.py first, need top_pioneer.csv
+    """
+    def pioneer_anlyze_score(self, pioneer_score_csv="top_pioneer.csv"):
+        df_top_pioneer = pd.read_csv(pioneer_score_csv)
+        df_merged = pd.merge(
+            df_top_pioneer,
+            self.df_score[["id", "alignment_score"]],
+            on="id", how="inner"
+        )
+        df_merged.sort_values("alignment_score")
+        df_merged.to_csv(os.path.join(self.output_dir, "pioneers_score.csv"), index=False)
+
+        # alignment and resonance are linear correlated?
+        r, p = pearsonr(df_merged["resonance"], df_merged["alignment_score"])
+        print("\n Pioneers Analysis")
+        print(f"Pearson r(Resonance, Alignment) = {r:.3f}, p = {p:.4f}, p <= 0.05? {p <= 0.05}")
+        corpus_mean = self.df_score["alignment_score"].mean()
+        pioneer_mean = df_merged["alignment_score"].mean()
+        df_corpus_non_pioneer = self.df_score[~self.df_score["id"].isin(df_merged["id"])]
+
+        # the differences between pioneer's alignment and other papers, counts?
+        t_stat, p_val = ttest_ind(
+            df_merged["alignment_score"],
+            df_corpus_non_pioneer["alignment_score"],
+            equal_var=False
+        )
+        print(f"Mean alignment - Pioneers: {pioneer_mean:.4f} | Corpus: {corpus_mean:.4f}, Delta: {corpus_mean - pioneer_mean:.4f}")
+        print(f"Welch t-test: t={t_stat:.3f}, p={p_val:.4f}, p <= 0.05? {p_val <= 0.05}")
+
+        fig, ax = plt.subplots(figsize=(8, 5))
+        scatter = ax.scatter(
+            df_merged["resonance"], df_merged["alignment_score"],
+            c=df_merged["year"], cmap="viridis", s=60, alpha=0.8
+        )
+        plt.colorbar(scatter, ax=ax, label="Publication Year")
+        ax.set_xlabel("Resonance Z-score")
+        ax.set_ylabel("Alignment Score")
+        ax.set_title(f"Pioneer Papers: Resonance vs Scope Alignment\n(r={r:.3f}, p={p:.3f})")
+        ax.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.output_dir, "pioneer_resonance_vs_alignment.png"), dpi=300)
+
+        return {"pearson_r": r, "p_value_corr": p,
+                "pioneer_mean_align": pioneer_mean, "corpus_mean_align": corpus_mean,
+                "ttest_p": p_val}
 
 
 if __name__ == "__main__":
@@ -142,4 +189,5 @@ if __name__ == "__main__":
     analyzer.find_outliers()
     analyzer.analyze_outlier_concepts()
     analyzer.cross_validate_with_topics("BertTopic/topic_bert_parquet")
+    print(analyzer.pioneer_anlyze_score("../Novelity_Resonance/top_pioneer.csv"))
 
