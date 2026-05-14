@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from similarity import PlotSimilarity
+from Src.Embeddings.similarity import PlotSimilarity
 import numpy as np
 import matplotlib.pyplot as plt
 import ast
@@ -79,7 +79,7 @@ class AnalyzeOutliers:
             rows.append({"concept": c, "pct_outlier": pct_out,
                          "pct_corpus": pct_corp, "overrepresentation": pct_out - pct_corp})
 
-        df_compare = pd.DataFrame(rows).sort_values("pct_outlier", ascending=False)
+        df_compare = pd.DataFrame(rows).sort_values("overrepresentation", ascending=False)
         print("over-representation concept:" ,df_compare[df_compare["overrepresentation"] > 0].head(20).to_string(index=False))
         return df_compare
 
