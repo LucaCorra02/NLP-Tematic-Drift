@@ -163,7 +163,7 @@ class PlotSimilarity:
         score_matrix = cosine_similarity(emb_matrix)
 
         fig, ax = plt.subplots(figsize=(10, 6))
-        im = ax.imshow(score_matrix)
+        im = ax.imshow(score_matrix, cmap="viridis")
         ax.set_xticks(range(len(years)), labels=years,
                       rotation=45, ha="right", rotation_mode="anchor")
         ax.set_yticks(range(len(years)), labels=years)
@@ -179,7 +179,9 @@ class PlotSimilarity:
         cbar.set_label("Similarity Score", rotation=270, labelpad=15)
         ax.set_title("Embedding Centroid per Year")
         fig.tight_layout()
-        plt.savefig(self.output_dir + "/heat_map.png")
+        plt.savefig(self.output_dir + "/heat-map.png")
+        plt.show()
+        plt.close()
 
     def heat_map_v2(self):
         df = self.df_merged
@@ -192,7 +194,7 @@ class PlotSimilarity:
         score_matrix = cosine_similarity(emb_matrix)
 
         fig, ax = plt.subplots(figsize=(10, 6))
-        im = ax.imshow(score_matrix)
+        im = ax.imshow(score_matrix, cmap="viridis")
         ax.set_xticks(range(len(years)), labels=years,
                       rotation=45, ha="right", rotation_mode="anchor")
         ax.set_yticks(range(len(years)), labels=years)
@@ -201,7 +203,9 @@ class PlotSimilarity:
         cbar.set_label("Similarity Score", rotation=270, labelpad=15)
         ax.set_title("Embedding Centroid per Year")
         fig.tight_layout()
-        plt.savefig(self.output_dir + "/heat_map_v2.png")
+        plt.savefig(self.output_dir + "/heat-map-v2.png")
+        plt.show()
+        plt.close()
 
     def plot_umap_2d(self):
         years, centroids_matrix = self._compute_centroids(self.df_merged)
@@ -274,7 +278,7 @@ class PlotSimilarity:
         cbar.set_label(f"Top {k_global_similar} Pairs Similarity", rotation=270, labelpad=15)
         ax.set_title("Symmetric Semantic Similarity Between Years")
         fig.tight_layout()
-        plt.savefig(self.output_dir + "/hat-,ap-k-score.png")
+        plt.savefig(self.output_dir + "/heatmapk-score.png")
         return score_matrix
 
 
@@ -319,7 +323,8 @@ class PlotSimilarity:
         ax.set_xlabel("Year")
         ax.set_ylabel("Year")
         fig.tight_layout()
-        plt.savefig(self.output_dir + "/heat_map.png", dpi=300)
+        plt.savefig(self.output_dir + "/heat-map-mmd.png", dpi=300)
+        plt.show()
         plt.close()
         return year_embeddings, intra_similarity, mmd_matrix
 
@@ -405,7 +410,7 @@ if __name__ == "__main__":
     plotsim.plot_umap_2d()
     plotsim.compute_k_mean_cosine(200)
     years_embeddings, intra_sim, mmd_matrix = plotsim.heat_map_mmd()
-    plotsim.mmd_permutation_test(years_embeddings, mmd_matrix, 1000)
+    #plotsim.mmd_permutation_test(years_embeddings, mmd_matrix, 1000)
 
     print(unify_scores)
     ris = plotsim.test_aligniment_trend()
