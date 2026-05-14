@@ -1,7 +1,7 @@
-from clear_data import *
-from scrape import *
-from validate_data import *
-from plot_data import *
+from Src.Data.clear_data import *
+from Src.Data.scrape import *
+from Src.Data.validate_data import *
+from Src.Data.plot_data import *
 import os
 
 """
