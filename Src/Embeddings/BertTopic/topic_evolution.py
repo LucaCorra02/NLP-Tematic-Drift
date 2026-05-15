@@ -564,6 +564,13 @@ class TopicEvolution:
                 if current_rank <= top_n_words:
                     words_in_top_n_ever.add(word)
 
+        first_period = period_labels[0]
+        last_period = period_labels[-1]
+        words_in_top_n_ever = {
+            w for w in words_in_top_n_ever
+            if (period_ranks[w].get(first_period, 9999) <= top_n_words + 2 or
+                period_ranks[w].get(last_period, 9999) <= top_n_words + 2)
+        }
         fig = go.Figure()
         colors = px.colors.qualitative.Dark24 + px.colors.qualitative.Light24
         for i, word in enumerate(words_in_top_n_ever):
@@ -610,7 +617,7 @@ class TopicEvolution:
                         font=dict(size=12, color='black')
                     )
         fig.update_layout(
-            title="Top 20 gloabl keyword",
+            title=f"Top {top_n_words} gloabl keyword",
             yaxis=dict(
                 autorange="reversed",
                 range=[top_n_words + 1, 0.5],
