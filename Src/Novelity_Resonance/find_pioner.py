@@ -87,16 +87,16 @@ class PioneerAnalyzer:
         df_result = pd.read_csv(self.metric_ris_path)
         df_plot = pd.merge(df_result, self.df_merged, on="id", how="inner")
         self.plot_df = df_plot
-        fig, axes = plt.subplots(1, 2, figsize=(16, 6))
-
+        plt.figure(figsize=(12, 10))
         sns.scatterplot(data=df_plot, x='Novelty_Z', y='Transience_Z',
-                        hue='publication_year', palette='viridis', alpha=0.6, ax=axes[0])
-        axes[0].plot([df_plot['Novelty_Z'].min(), df_plot['Novelty_Z'].max()],
+                        hue='publication_year', palette='viridis', alpha=0.6)
+        plt.plot([df_plot['Novelty_Z'].min(), df_plot['Novelty_Z'].max()],
                      [df_plot['Novelty_Z'].min(), df_plot['Novelty_Z'].max()],
                      'r--', label='X=Y (Trade-off)')
-        axes[0].set_title('Novelty vs Transience')
-        axes[0].legend()
+        plt.title('Novelty vs Transience')
+        plt.legend()
 
+        """
         yearly_res = df_plot.groupby('publication_year')['Resonance_Z'].mean().reset_index()
         sns.lineplot(data=yearly_res, x='publication_year', y='Resonance_Z', marker='o',
                      color='b', linewidth=2, ax=axes[1])
@@ -104,8 +104,9 @@ class PioneerAnalyzer:
         axes[1].set_xlabel('Year')
         axes[1].set_ylabel('Mean Resonance')
         axes[1].grid(True, linestyle='--', alpha=0.7)
+        """
         plt.tight_layout()
-        plt.savefig(self.graphics_path / "Scatter.jpeg")
+        plt.savefig(self.graphics_path / "Scatter.png")
 
     def plot_distribution(self):
         fig, axs = plt.subplots(1, 2, sharey=True, tight_layout=True)
