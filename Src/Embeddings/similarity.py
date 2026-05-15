@@ -217,7 +217,7 @@ class PlotSimilarity:
 
         x_coords = mapper.embedding_[:, 0]
         y_coords = mapper.embedding_[:, 1]
-        plt.figure(figsize=(10, 8))
+        plt.figure(figsize=(12, 10))
         scatter = plt.scatter(x_coords, y_coords, c=years, cmap='Spectral', s=100)
 
         for i, year in enumerate(years):
