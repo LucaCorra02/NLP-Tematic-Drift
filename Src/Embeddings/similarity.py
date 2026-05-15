@@ -163,7 +163,7 @@ class PlotSimilarity:
         score_matrix = cosine_similarity(emb_matrix)
 
         fig, ax = plt.subplots(figsize=(10, 6))
-        im = ax.imshow(score_matrix, cmap="viridis")
+        im = ax.imshow(score_matrix, cmap="YlOrRd_r")
         ax.set_xticks(range(len(years)), labels=years,
                       rotation=45, ha="right", rotation_mode="anchor")
         ax.set_yticks(range(len(years)), labels=years)
@@ -193,8 +193,8 @@ class PlotSimilarity:
         emb_matrix = np.vstack(diff_centroid)
         score_matrix = cosine_similarity(emb_matrix)
 
-        fig, ax = plt.subplots(figsize=(10, 6))
-        im = ax.imshow(score_matrix, cmap="viridis")
+        fig, ax = plt.subplots(figsize=(12, 10))
+        im = ax.imshow(score_matrix, cmap="YlOrRd_r")
         ax.set_xticks(range(len(years)), labels=years,
                       rotation=45, ha="right", rotation_mode="anchor")
         ax.set_yticks(range(len(years)), labels=years)
@@ -271,7 +271,7 @@ class PlotSimilarity:
         fig, ax = plt.subplots(figsize=(10, 8))
         vmin = np.nanmin(score_matrix)
         vmax = np.nanmax(score_matrix)
-        im = ax.imshow(score_matrix, cmap="viridis", vmin=vmin, vmax=vmax)
+        im = ax.imshow(score_matrix, cmap="RdYlGn_r", vmin=vmin, vmax=vmax)
         ax.set_xticks(range(len(years)), labels=years, rotation=45, ha="right", rotation_mode="anchor")
         ax.set_yticks(range(len(years)), labels=years)
         cbar = fig.colorbar(im, ax=ax)
